@@ -65,7 +65,7 @@ const ClassRecord = () => {
     const [recordForm, setRecordForm] = useState({
         studentId: '',
         studentName: '',
-        date: new Date().toISOString().slice(0, 16),
+        date: new Date().toISOString().slice(0, 10),
         classRange: '',
         typingResult: '',
         writingResult: '',
@@ -126,7 +126,7 @@ const ClassRecord = () => {
             setRecordForm({
                 studentId: record.studentId,
                 studentName: record.studentName,
-                date: record.date.slice(0, 16),
+                date: record.date.slice(0, 10),
                 classRange: record.classRange,
                 typingResult: record.typingResult,
                 writingResult: record.writingResult,
@@ -138,7 +138,7 @@ const ClassRecord = () => {
             setRecordForm({
                 studentId: selectedStudent?.id || '',
                 studentName: selectedStudent?.name || '',
-                date: new Date().toISOString().slice(0, 16),
+                date: new Date().toISOString().slice(0, 10),
                 classRange: '',
                 typingResult: '',
                 writingResult: '',
@@ -179,7 +179,7 @@ const ClassRecord = () => {
         try {
             const recordData = {
                 ...recordForm,
-                date: new Date(recordForm.date).toISOString()
+                date: new Date(recordForm.date + 'T00:00:00').toISOString()
             };
 
             if (editingRecord) {
@@ -442,8 +442,8 @@ const ClassRecord = () => {
                             <Grid item xs={12} md={6}>
                                 <TextField
                                     fullWidth
-                                    label="実施日時 *"
-                                    type="datetime-local"
+                                    label="実施日 *"
+                                    type="date"
                                     value={recordForm.date}
                                     onChange={(e) => handleFormChange('date', e.target.value)}
                                     margin="normal"
