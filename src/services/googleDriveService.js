@@ -226,7 +226,8 @@ export const uploadEvaluationSheet = async (imageBlob, classRecord) => {
         return {
             fileId: uploadResult.id,
             fileName: uploadResult.name,
-            webViewLink: `https://drive.google.com/file/d/${uploadResult.id}/view`
+            webViewLink: `https://drive.google.com/file/d/${uploadResult.id}/view`,
+            uploadPath: folderPath
         };
     } catch (error) {
         console.error('評価シートアップロードエラー:', error);

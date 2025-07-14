@@ -49,6 +49,7 @@ import {
     getCommentTemplates
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
+import { uploadEvaluationSheet, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
 
 const ClassRecord = () => {
     const { studentId } = useParams();
@@ -233,7 +234,22 @@ const ClassRecord = () => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            showSnackbar('評価シート画像を生成しました');
+            // Google Drive連携チェック
+            if (isGoogleAuthenticated()) {
+                try {
+                    showSnackbar('Google Driveにアップロードしています...', 'info');
+                    const uploadResult = await uploadEvaluationSheet(imageBlob, record);
+                    showSnackbar(
+                        `評価シート画像を生成し、Google Driveにアップロードしました\nパス: ${uploadResult.uploadPath || '生徒管理フォルダ'}`,
+                        'success'
+                    );
+                } catch (uploadError) {
+                    console.error('Google Drive アップロードエラー:', uploadError);
+                    showSnackbar('画像生成は完了しましたが、Google Driveアップロードに失敗しました', 'warning');
+                }
+            } else {
+                showSnackbar('評価シート画像を生成しました（Google Drive未連携）');
+            }
         } catch (error) {
             showSnackbar('画像生成に失敗しました', 'error');
         }

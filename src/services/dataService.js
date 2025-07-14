@@ -286,11 +286,63 @@ export const initializeDemoData = async () => {
                 { name: '鈴木一郎', age: 8, course: 'スクラッチプログラミング', googleDriveFolder: '生徒管理/鈴木一郎' }
             ];
 
+            const createdStudents = [];
             for (const student of demoStudents) {
-                await addStudent(student);
+                const createdStudent = await addStudent(student);
+                createdStudents.push(createdStudent);
             }
 
             console.log('デモ生徒データを作成しました');
+
+            // デモ授業記録データ
+            const classRecords = await getClassRecords();
+            if (classRecords.length === 0) {
+                const currentDate = new Date();
+                const oneWeekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+                const twoWeeksAgo = new Date(currentDate.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+                const demoRecords = [
+                    {
+                        studentId: createdStudents[0].id,
+                        studentName: createdStudents[0].name,
+                        date: currentDate.toISOString(),
+                        classRange: 'スプライトの動きとイベント',
+                        typingResult: '35文字/分、正確率92%',
+                        writingResult: '基本操作 8/10問正解',
+                        comment: '今日も集中して取り組むことができました。キーボード操作にも慣れてきています。',
+                        nextClassRange: 'ゲーム制作の基礎',
+                        instructor: 'メンター田中'
+                    },
+                    {
+                        studentId: createdStudents[1].id,
+                        studentName: createdStudents[1].name,
+                        date: oneWeekAgo.toISOString(),
+                        classRange: 'センサーを使ったプログラミング',
+                        typingResult: '42文字/分、正確率95%',
+                        writingResult: '応用問題 9/10問正解',
+                        comment: 'センサーの概念をしっかりと理解できています。論理的思考力が向上しています。',
+                        nextClassRange: 'ロボットの自動制御',
+                        instructor: 'スタッフ佐藤'
+                    },
+                    {
+                        studentId: createdStudents[2].id,
+                        studentName: createdStudents[2].name,
+                        date: twoWeeksAgo.toISOString(),
+                        classRange: 'キャラクターの基本動作',
+                        typingResult: '28文字/分、正確率88%',
+                        writingResult: '基本操作 7/10問正解',
+                        comment: 'もう少しゆっくりと丁寧に進めましょう。基本操作の復習が必要です。',
+                        nextClassRange: 'イベントとメッセージ',
+                        instructor: 'メンター田中'
+                    }
+                ];
+
+                for (const record of demoRecords) {
+                    await addClassRecord(record);
+                }
+
+                console.log('デモ授業記録データを作成しました');
+            }
         }
     } catch (error) {
         console.error('デモデータの初期化に失敗しました:', error);

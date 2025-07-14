@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import StudentManagement from './components/StudentManagement';
 import ClassRecord from './components/ClassRecord';
 import Navbar from './components/Navbar';
+import { initializeDemoData } from './services/dataService';
 
 function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -20,6 +21,9 @@ function App() {
             setIsAuthenticated(true);
             setUser(JSON.parse(savedUser));
         }
+
+        // デモデータの初期化
+        initializeDemoData();
     }, []);
 
     const handleLogin = (userData) => {
@@ -53,7 +57,7 @@ function App() {
                 </Toolbar>
             </AppBar>
 
-            <Navbar onLogout={handleLogout} />
+            <Navbar onLogout={handleLogout} user={user} />
 
             <Container maxWidth="xl" sx={{ mt: 2, mb: 2 }}>
                 <Routes>
