@@ -202,93 +202,64 @@ const MentorManagement = () => {
         return new Date(dateString).toLocaleDateString('ja-JP');
     };
 
-    if (loading) {
-        return (
-            <Box sx={{ width: '100%', mt: 2 }}>
-                <LinearProgress />
-                <Typography sx={{ mt: 2, textAlign: 'center' }}>
-                    メンターデータを読み込んでいます...
-                </Typography>
-            </Box>
-        );
-    }
+
 
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PersonAdd />
-                メンター管理
-            </Typography>
-
-            {/* 統計カード */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={4}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                                総メンター数
-                            </Typography>
-                            <Typography variant="h4">
-                                {mentors.length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                                稼働中
-                            </Typography>
-                            <Typography variant="h4" color="success.main">
-                                {mentors.filter(m => m.status === 'active').length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                    <Card>
-                        <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                                休職中
-                            </Typography>
-                            <Typography variant="h4" color="warning.main">
-                                {mentors.filter(m => m.status === 'inactive').length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-
-            {/* 検索 */}
-            <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
-                <TextField
-                    label="メンター検索"
-                    placeholder="名前、メール、専門分野で検索..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <Search />
-                            </InputAdornment>
-                        ),
-                    }}
-                    sx={{ flexGrow: 1 }}
-                />
-                <Button variant="outlined" onClick={handleSearch}>
-                    検索
-                </Button>
-                <Button variant="outlined" onClick={loadMentors}>
-                    リセット
+        <Box>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                <Typography variant="h4">
+                    メンター管理
+                </Typography>
+                <Button
+                    variant="contained"
+                    startIcon={<PersonAdd />}
+                    onClick={() => handleOpenDialog()}
+                >
+                    新規追加
                 </Button>
             </Box>
 
+            {/* 検索バー */}
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} md={8}>
+                            <TextField
+                                fullWidth
+                                label="メンター検索"
+                                placeholder="名前、メール、専門分野で検索..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <Search />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                onClick={handleSearch}
+                                startIcon={<Search />}
+                            >
+                                検索
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
+
+            {/* 読み込み中 */}
+            {loading && <LinearProgress sx={{ mb: 2 }} />}
+
             {/* メンターテーブル */}
-            <Paper>
-                <TableContainer>
-                    <Table>
+            <TableContainer component={Paper}>
+                <Table>
                         <TableHead>
                             <TableRow>
                                 <TableCell>メンター名</TableCell>
@@ -369,13 +340,17 @@ const MentorManagement = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
-            </Paper>
 
             {/* 新規追加ボタン */}
             <Fab
                 color="primary"
                 aria-label="メンター追加"
-                sx={{ position: 'fixed', bottom: 80, right: 16 }}
+                sx={{ 
+                    position: 'fixed', 
+                    bottom: 80, 
+                    right: 16,
+                    display: { xs: 'flex', md: 'none' }
+                }}
                 onClick={() => handleOpenDialog()}
             >
                 <Add />
