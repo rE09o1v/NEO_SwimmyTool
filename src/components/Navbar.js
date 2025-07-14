@@ -26,7 +26,8 @@ import {
     CloudDone,
     CloudOff,
     Person,
-    Settings
+    Settings,
+    PersonAdd
 } from '@mui/icons-material';
 import { isAuthenticated as isGoogleAuthenticated, signOutGoogleDrive } from '../services/googleDriveService';
 
@@ -38,11 +39,22 @@ const Navbar = ({ onLogout, user }) => {
     const [googleConnected, setGoogleConnected] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
 
-    const navigationItems = [
-        { label: 'ダッシュボード', icon: <Dashboard />, path: '/' },
-        { label: '生徒管理', icon: <People />, path: '/students' },
-        { label: '授業記録', icon: <Assignment />, path: '/class-record' }
-    ];
+    const getNavigationItems = () => {
+        const baseItems = [
+            { label: 'ダッシュボード', icon: <Dashboard />, path: '/' },
+            { label: '生徒管理', icon: <People />, path: '/students' },
+            { label: '授業記録', icon: <Assignment />, path: '/class-record' }
+        ];
+
+        // 管理者の場合はメンター管理を追加
+        if (user && user.role === 'admin') {
+            baseItems.push({ label: 'メンター管理', icon: <PersonAdd />, path: '/mentors' });
+        }
+
+        return baseItems;
+    };
+
+    const navigationItems = getNavigationItems();
 
     useEffect(() => {
         // Google Drive連携状態を定期的にチェック

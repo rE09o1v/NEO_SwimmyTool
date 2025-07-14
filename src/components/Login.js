@@ -28,8 +28,6 @@ const Login = ({ onLogin }) => {
 
     // デモ用の認証情報
     const validCredentials = [
-        { username: 'mentor1', password: 'password123', name: 'メンター田中' },
-        { username: 'staff1', password: 'password123', name: 'スタッフ佐藤' },
         { username: 'admin', password: 'admin123', name: '管理者' }
     ];
 
@@ -98,7 +96,7 @@ const Login = ({ onLogin }) => {
                         name: userInfo.name,
                         email: userInfo.email,
                         picture: userInfo.picture,
-                        role: 'mentor',
+                        role: 'admin',
                         loginType: 'google',
                         googleAuthenticated: true
                     });
@@ -107,7 +105,7 @@ const Login = ({ onLogin }) => {
                     onLogin({
                         id: 'google_user',
                         name: 'Google ユーザー',
-                        role: 'mentor',
+                        role: 'admin',
                         loginType: 'google',
                         googleAuthenticated: true
                     });
@@ -241,9 +239,10 @@ const Login = ({ onLogin }) => {
                     <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                         <Typography variant="body2" color="text.secondary">
                             <strong>デモ用アカウント:</strong><br />
-                            メンター: mentor1 / password123<br />
-                            スタッフ: staff1 / password123<br />
-                            管理者: admin / admin123
+                            管理者: admin / admin123<br />
+                            <br />
+                            <strong>※</strong> 全てのメンターが同一の管理者アカウントを使用します<br />
+                            Googleアカウントでのログインも管理者権限となります
                         </Typography>
                     </Box>
                 </Paper>

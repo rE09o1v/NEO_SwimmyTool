@@ -4,7 +4,8 @@
 const STORAGE_KEYS = {
     STUDENTS: 'swimmy_students',
     CLASS_RECORDS: 'swimmy_class_records',
-    TEMPLATES: 'swimmy_comment_templates'
+    TEMPLATES: 'swimmy_comment_templates',
+    MENTORS: 'swimmy_mentors'
 };
 
 // ユーティリティ関数
@@ -344,7 +345,153 @@ export const initializeDemoData = async () => {
                 console.log('デモ授業記録データを作成しました');
             }
         }
+        // デモメンターデータの初期化
+        const mentors = await getMentors();
+        if (mentors.length === 0) {
+            const demoMentors = [
+                {
+                    name: 'メンター田中',
+                    email: 'tanaka@example.com',
+                    speciality: 'スクラッチプログラミング',
+                    status: 'active',
+                    joinDate: '2024-01-15'
+                },
+                {
+                    name: 'スタッフ佐藤',
+                    email: 'sato@example.com',
+                    speciality: 'ロボットプログラミング',
+                    status: 'active',
+                    joinDate: '2024-02-01'
+                },
+                {
+                    name: 'メンター鈴木',
+                    email: 'suzuki@example.com',
+                    speciality: 'Pythonプログラミング',
+                    status: 'active',
+                    joinDate: '2024-03-10'
+                }
+            ];
+
+            for (const mentor of demoMentors) {
+                await addMentor(mentor);
+            }
+
+            console.log('デモメンターデータを作成しました');
+        }
     } catch (error) {
         console.error('デモデータの初期化に失敗しました:', error);
     }
+};
+
+// メンター管理機能
+export const getMentors = async () => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const mentors = getFromStorage(STORAGE_KEYS.MENTORS);
+            resolve(mentors);
+        }, 100);
+    });
+};
+
+export const getMentor = async (id) => {
+    const mentors = await getMentors();
+    return mentors.find(mentor => mentor.id === id);
+};
+
+export const addMentor = async (mentorData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const mentors = await getMentors();
+                
+                // 重複チェック
+                const existingMentor = mentors.find(m => m.email === mentorData.email);
+                if (existingMentor) {
+                    reject(new Error('このメールアドレスは既に登録されています'));
+                    return;
+                }
+
+                const newMentor = {
+                    id: generateId(),
+                    ...mentorData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    status: 'active'
+                };
+
+                mentors.push(newMentor);
+                saveToStorage(STORAGE_KEYS.MENTORS, mentors);
+                resolve(newMentor);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const updateMentor = async (id, mentorData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const mentors = await getMentors();
+                const index = mentors.findIndex(mentor => mentor.id === id);
+                
+                if (index === -1) {
+                    reject(new Error('メンターが見つかりません'));
+                    return;
+                }
+
+                // メールアドレスの重複チェック（自分以外）
+                if (mentorData.email) {
+                    const existingMentor = mentors.find(m => m.email === mentorData.email && m.id !== id);
+                    if (existingMentor) {
+                        reject(new Error('このメールアドレスは既に登録されています'));
+                        return;
+                    }
+                }
+
+                mentors[index] = {
+                    ...mentors[index],
+                    ...mentorData,
+                    updatedAt: new Date().toISOString()
+                };
+
+                saveToStorage(STORAGE_KEYS.MENTORS, mentors);
+                resolve(mentors[index]);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const deleteMentor = async (id) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const mentors = await getMentors();
+                const index = mentors.findIndex(mentor => mentor.id === id);
+                
+                if (index === -1) {
+                    reject(new Error('メンターが見つかりません'));
+                    return;
+                }
+
+                mentors.splice(index, 1);
+                saveToStorage(STORAGE_KEYS.MENTORS, mentors);
+                resolve(true);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const searchMentors = async (query) => {
+    const mentors = await getMentors();
+    return mentors.filter(mentor => 
+        mentor.name.toLowerCase().includes(query.toLowerCase()) ||
+        mentor.email.toLowerCase().includes(query.toLowerCase()) ||
+        mentor.speciality.toLowerCase().includes(query.toLowerCase())
+    );
 }; 

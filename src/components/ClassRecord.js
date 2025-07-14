@@ -23,6 +23,10 @@ import {
     Tabs,
     Tab,
     Autocomplete,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
     Paper,
     Divider,
     LinearProgress,
@@ -46,7 +50,8 @@ import {
     addClassRecord,
     updateClassRecord,
     deleteClassRecord,
-    getCommentTemplates
+    getCommentTemplates,
+    getMentors
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
 import { uploadEvaluationSheet, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
@@ -58,6 +63,7 @@ const ClassRecord = () => {
     const [students, setStudents] = useState([]);
     const [classRecords, setClassRecords] = useState([]);
     const [commentTemplates, setCommentTemplates] = useState([]);
+    const [mentors, setMentors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
@@ -89,13 +95,15 @@ const ClassRecord = () => {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [studentsData, templatesData] = await Promise.all([
+            const [studentsData, templatesData, mentorsData] = await Promise.all([
                 getStudents(),
-                getCommentTemplates()
+                getCommentTemplates(),
+                getMentors()
             ]);
 
             setStudents(studentsData);
             setCommentTemplates(templatesData);
+            setMentors(mentorsData);
 
             if (studentId) {
                 const student = studentsData.find(s => s.id === studentId);
@@ -482,13 +490,23 @@ const ClassRecord = () => {
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="担当者 *"
-                                    value={recordForm.instructor}
-                                    onChange={(e) => handleFormChange('instructor', e.target.value)}
-                                    margin="normal"
-                                />
+                                <FormControl fullWidth margin="normal" required>
+                                    <InputLabel>担当者 *</InputLabel>
+                                    <Select
+                                        value={recordForm.instructor}
+                                        label="担当者 *"
+                                        onChange={(e) => handleFormChange('instructor', e.target.value)}
+                                    >
+                                        {mentors
+                                            .filter(mentor => mentor.status === 'active')
+                                            .map((mentor) => (
+                                                <MenuItem key={mentor.id} value={mentor.name}>
+                                                    {mentor.name} ({mentor.speciality})
+                                                </MenuItem>
+                                            ))
+                                        }
+                                    </Select>
+                                </FormControl>
                             </Grid>
                             <Grid item xs={12}>
                                 <TextField

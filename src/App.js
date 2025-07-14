@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import StudentManagement from './components/StudentManagement';
 import ClassRecord from './components/ClassRecord';
+import MentorManagement from './components/MentorManagement';
 import Navbar from './components/Navbar';
 import { initializeDemoData } from './services/dataService';
 
@@ -65,6 +66,14 @@ function App() {
                     <Route path="/students" element={<StudentManagement />} />
                     <Route path="/class-record" element={<ClassRecord />} />
                     <Route path="/class-record/:studentId" element={<ClassRecord />} />
+                    <Route 
+                        path="/mentors" 
+                        element={
+                            user && user.role === 'admin' 
+                                ? <MentorManagement /> 
+                                : <Navigate to="/" replace />
+                        } 
+                    />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </Container>
