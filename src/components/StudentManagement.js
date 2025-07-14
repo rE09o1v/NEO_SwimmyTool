@@ -155,7 +155,7 @@ const StudentManagement = () => {
                 name: studentForm.name,
                 age: parseInt(studentForm.age),
                 course: studentForm.course,
-                googleDriveFolder: studentForm.googleDriveFolder || `/生徒フォルダ/${studentForm.name}`
+                googleDriveFolder: studentForm.googleDriveFolder || `生徒管理/${studentForm.name}`
             };
 
             if (editingStudent) {

@@ -281,9 +281,9 @@ export const initializeDemoData = async () => {
         if (students.length === 0) {
             // デモ生徒データ
             const demoStudents = [
-                { name: '田中太郎', age: 10, course: 'スクラッチプログラミング', googleDriveFolder: '/生徒フォルダ/田中太郎' },
-                { name: '佐藤花子', age: 12, course: 'ロボットプログラミング', googleDriveFolder: '/生徒フォルダ/佐藤花子' },
-                { name: '鈴木一郎', age: 8, course: 'スクラッチプログラミング', googleDriveFolder: '/生徒フォルダ/鈴木一郎' }
+                { name: '田中太郎', age: 10, course: 'スクラッチプログラミング', googleDriveFolder: '生徒管理/田中太郎' },
+                { name: '佐藤花子', age: 12, course: 'ロボットプログラミング', googleDriveFolder: '生徒管理/佐藤花子' },
+                { name: '鈴木一郎', age: 8, course: 'スクラッチプログラミング', googleDriveFolder: '生徒管理/鈴木一郎' }
             ];
 
             for (const student of demoStudents) {

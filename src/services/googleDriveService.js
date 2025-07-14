@@ -200,30 +200,27 @@ export const uploadFile = async (fileBlob, fileName, folderId = null) => {
 // 評価シート画像をGoogle Driveにアップロード
 export const uploadEvaluationSheet = async (imageBlob, classRecord) => {
     try {
-        const fileName = `評価シート_${classRecord.studentName}_${new Date(classRecord.date).toISOString().slice(0, 10)}.png`;
+        const classDate = new Date(classRecord.date).toISOString().slice(0, 10);
+        const fileName = `評価シート_${classRecord.studentName}_${classDate}.png`;
 
-        // 生徒フォルダを取得または作成
-        let studentFolder = null;
-        if (classRecord.studentFolder || classRecord.googleDriveFolder) {
-            const folderPath = classRecord.studentFolder || classRecord.googleDriveFolder;
+        // フォルダ構造: 生徒管理/{生徒名}/{授業日}
+        const folderPath = `生徒管理/${classRecord.studentName}/${classDate}`;
+        const folderNames = folderPath.split('/').filter(name => name.trim() !== '');
+        let currentParentId = null;
 
-            // フォルダパスを解析して階層フォルダを作成
-            const folderNames = folderPath.split('/').filter(name => name.trim() !== '');
-            let currentParentId = null;
-
-            for (const folderName of folderNames) {
-                const folder = await createOrGetFolder(folderName, currentParentId);
-                currentParentId = folder.id;
-            }
-
-            studentFolder = { id: currentParentId };
+        // 階層フォルダを順次作成
+        for (const folderName of folderNames) {
+            const folder = await createOrGetFolder(folderName, currentParentId);
+            currentParentId = folder.id;
         }
+
+        const targetFolder = { id: currentParentId };
 
         // ファイルアップロード
         const uploadResult = await uploadFile(
             imageBlob,
             fileName,
-            studentFolder?.id
+            targetFolder?.id
         );
 
         return {
@@ -276,10 +273,12 @@ export const signOutGoogleDrive = () => {
 export const mockUploadEvaluationSheet = async (imageBlob, classRecord) => {
     return new Promise((resolve) => {
         setTimeout(() => {
+            const classDate = new Date(classRecord.date).toISOString().slice(0, 10);
             resolve({
                 fileId: `mock_${Date.now()}`,
-                fileName: `評価シート_${classRecord.studentName}_${new Date(classRecord.date).toISOString().slice(0, 10)}.png`,
+                fileName: `評価シート_${classRecord.studentName}_${classDate}.png`,
                 webViewLink: `https://drive.google.com/file/d/mock_${Date.now()}/view`,
+                uploadPath: `生徒管理/${classRecord.studentName}/${classDate}/`,
                 message: 'デモモード: 実際のアップロードは行われていません'
             });
         }, 2000);
