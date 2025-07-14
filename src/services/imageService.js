@@ -79,6 +79,18 @@ const createEvaluationSheetHtml = (record) => {
         </div>
       </div>
       
+      <!-- 担当者情報 -->
+      ${record.instructor ? `
+      <div style="margin-bottom: 25px;">
+        <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
+          <div style="display: flex; align-items: center;">
+            <span style="font-weight: bold; color: #333; width: 80px;">担当者:</span>
+            <span style="font-size: 16px; color: #000; border-bottom: 1px solid #333; flex: 1; padding: 5px;">${record.instructor}</span>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+      
       <!-- 授業内容 -->
       <div style="margin-bottom: 25px;">
         <h3 style="background-color: #f0f8ff; padding: 10px; margin: 0 0 15px 0; border-left: 4px solid #1976d2;">授業内容</h3>

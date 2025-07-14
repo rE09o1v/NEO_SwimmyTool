@@ -62,6 +62,7 @@ const ClassRecord = () => {
     const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
     const [editingRecord, setEditingRecord] = useState(null);
     const [selectedStudent, setSelectedStudent] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
     const [recordForm, setRecordForm] = useState({
         studentId: '',
         studentName: '',
@@ -70,11 +71,17 @@ const ClassRecord = () => {
         typingResult: '',
         writingResult: '',
         comment: '',
-        nextClassRange: ''
+        nextClassRange: '',
+        instructor: ''
     });
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
+        // ログインユーザー情報を取得
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+            setCurrentUser(JSON.parse(savedUser));
+        }
         loadData();
     }, [studentId]);
 
@@ -131,7 +138,8 @@ const ClassRecord = () => {
                 typingResult: record.typingResult,
                 writingResult: record.writingResult,
                 comment: record.comment,
-                nextClassRange: record.nextClassRange
+                nextClassRange: record.nextClassRange,
+                instructor: record.instructor || ''
             });
         } else {
             setEditingRecord(null);
@@ -143,7 +151,8 @@ const ClassRecord = () => {
                 typingResult: '',
                 writingResult: '',
                 comment: '',
-                nextClassRange: ''
+                nextClassRange: '',
+                instructor: currentUser?.name || ''
             });
         }
         setOpenDialog(true);
@@ -171,7 +180,7 @@ const ClassRecord = () => {
     };
 
     const handleSubmit = async () => {
-        if (!recordForm.studentId || !recordForm.classRange) {
+        if (!recordForm.studentId || !recordForm.classRange || !recordForm.instructor) {
             showSnackbar('必須項目を入力してください', 'error');
             return;
         }
@@ -300,6 +309,12 @@ const ClassRecord = () => {
                                         <Typography variant="body2" color="text.secondary" gutterBottom>
                                             授業範囲: {record.classRange}
                                         </Typography>
+
+                                        {record.instructor && (
+                                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                担当者: {record.instructor}
+                                            </Typography>
+                                        )}
 
                                         {record.typingResult && (
                                             <Typography variant="body2" color="text.secondary">
@@ -448,6 +463,15 @@ const ClassRecord = () => {
                                     onChange={(e) => handleFormChange('date', e.target.value)}
                                     margin="normal"
                                     InputLabelProps={{ shrink: true }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    label="担当者 *"
+                                    value={recordForm.instructor}
+                                    onChange={(e) => handleFormChange('instructor', e.target.value)}
+                                    margin="normal"
                                 />
                             </Grid>
                             <Grid item xs={12}>
