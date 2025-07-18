@@ -56,6 +56,195 @@ import {
 import { generateEvaluationSheet } from '../services/imageService';
 import { uploadEvaluationSheet, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
 
+// タイピング評価レベル（9級〜1級用）
+const TYPING_LEVELS = [
+    'E-', 'E', 'E+', 'D-', 'D', 'D+', 'C-', 'C', 'C+',
+    'B-', 'B', 'B+', 'A-', 'A', 'A+', 'S', 'Good', 'Fast'
+];
+
+// タイピング級の選択肢
+const TYPING_GRADES = [
+    '12級', '11級', '10級', '9級', '8級', '7級', '6級', '5級', '4級', '3級', '2級', '1級'
+];
+
+// 級ごとのテーマ定義
+const TYPING_THEMES = {
+    '9級': ['しりとり2文字', 'しりとり3文字'],
+    '8級': ['しりとり4文字', 'しりとり5文字'],
+    '7級': ['食べもの', '動物', 'ことわざ'],
+    '6級': ['魚', '植物', 'エコ生活のコツ'],
+    '5級': ['回文', '都道府県', '掃除のコツ'],
+    '4級': ['四字熟語', '料理の名前', '早口言葉'],
+    '3級': ['中学英単語総合', '日本の昔話', 'スポーツの起源'],
+    '2級': ['中学英単語総合', '世界の童話', 'オリジナル'],
+    '1級': ['高校英単語総合', '料理のレシピ', '名作']
+};
+
+// タイピング結果を表示用文字列に変換する関数
+const formatTypingResult = (typingResult) => {
+    if (!typingResult) return '';
+
+    try {
+        const parsed = JSON.parse(typingResult);
+        const grade = parsed.grade;
+        const data = parsed.data;
+
+        if (!grade) return '';
+
+        const isBasicGrade = ['12級', '11級', '10級'].includes(grade);
+
+        if (isBasicGrade) {
+            const charCount = data.basicData?.charCount || '';
+            const accuracy = data.basicData?.accuracy || '';
+            return `${grade}: ${charCount}${charCount ? '文字' : ''}${charCount && accuracy ? ', ' : ''}${accuracy}`;
+        } else {
+            const themes = data.advancedData || [];
+            const results = themes
+                .filter(theme => theme.theme || theme.level)
+                .map(theme => `${theme.theme || '?'}: ${theme.level || '?'}`)
+                .join(', ');
+            return `${grade}: ${results || '記録なし'}`;
+        }
+    } catch (e) {
+        // 古い形式の場合はそのまま表示
+        return typingResult;
+    }
+};
+
+// タイピング結果入力コンポーネント
+const TypingResultInput = ({ typingGrade, typingData, onChange }) => {
+    const isBasicGrade = ['12級', '11級', '10級'].includes(typingGrade);
+    const availableThemes = TYPING_THEMES[typingGrade] || [];
+
+    const handleBasicDataChange = (field, value) => {
+        onChange({
+            ...typingData,
+            basicData: {
+                ...typingData.basicData,
+                [field]: value
+            }
+        });
+    };
+
+    const handleAdvancedDataChange = (index, field, value) => {
+        const newAdvancedData = [...(typingData.advancedData || [])];
+        while (newAdvancedData.length <= index) {
+            newAdvancedData.push({ theme: '', level: '' });
+        }
+
+        // テーマは自動設定
+        if (field === 'level') {
+            newAdvancedData[index] = {
+                theme: availableThemes[index] || '',
+                level: value
+            };
+        }
+
+        onChange({
+            ...typingData,
+            advancedData: newAdvancedData
+        });
+    };
+
+    // 初期化時にテーマを自動設定
+    React.useEffect(() => {
+        if (!isBasicGrade && availableThemes.length > 0) {
+            const newAdvancedData = [...(typingData.advancedData || [])];
+            let hasChanges = false;
+
+            availableThemes.forEach((theme, index) => {
+                if (!newAdvancedData[index]) {
+                    newAdvancedData[index] = { theme: theme, level: '' };
+                    hasChanges = true;
+                } else if (newAdvancedData[index].theme !== theme) {
+                    newAdvancedData[index].theme = theme;
+                    hasChanges = true;
+                }
+            });
+
+            if (hasChanges) {
+                onChange({
+                    ...typingData,
+                    advancedData: newAdvancedData
+                });
+            }
+        }
+    }, [typingGrade, availableThemes, isBasicGrade]);
+
+    if (!typingGrade) {
+        return (
+            <Typography variant="body2" color="text.secondary">
+                タイピング級を選択してください
+            </Typography>
+        );
+    }
+
+    if (isBasicGrade) {
+        return (
+            <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                    <TextField
+                        fullWidth
+                        label="入力文字数"
+                        value={typingData.basicData?.charCount || ''}
+                        onChange={(e) => handleBasicDataChange('charCount', e.target.value)}
+                        placeholder="例: 120文字"
+                        margin="normal"
+                    />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <TextField
+                        fullWidth
+                        label="正タイプ率"
+                        value={typingData.basicData?.accuracy || ''}
+                        onChange={(e) => handleBasicDataChange('accuracy', e.target.value)}
+                        placeholder="例: 95%"
+                        margin="normal"
+                    />
+                </Grid>
+            </Grid>
+        );
+    }
+
+    return (
+        <Grid container spacing={2}>
+            {availableThemes.map((theme, index) => (
+                <Grid item xs={12} key={index}>
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={12} md={6}>
+                            <Typography variant="body1" sx={{
+                                padding: '12px',
+                                backgroundColor: '#f5f5f5',
+                                borderRadius: '4px',
+                                border: '1px solid #e0e0e0'
+                            }}>
+                                {theme}
+                            </Typography>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>評価レベル</InputLabel>
+                                <Select
+                                    value={typingData.advancedData?.[index]?.level || ''}
+                                    label="評価レベル"
+                                    onChange={(e) => handleAdvancedDataChange(index, 'level', e.target.value)}
+                                >
+                                    <MenuItem value="">選択してください</MenuItem>
+                                    {TYPING_LEVELS.map((level) => (
+                                        <MenuItem key={level} value={level}>
+                                            {level}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            ))}
+        </Grid>
+    );
+};
+
 const ClassRecord = () => {
     const { studentId } = useParams();
     const navigate = useNavigate();
@@ -75,7 +264,14 @@ const ClassRecord = () => {
         studentName: '',
         date: new Date().toISOString().slice(0, 10),
         classRange: '',
-        typingResult: '',
+        typingGrade: '',
+        typingData: {
+            basicData: {
+                charCount: '',
+                accuracy: ''
+            },
+            advancedData: []
+        },
         writingResult: '',
         comment: '',
         nextClassRange: '',
@@ -139,12 +335,33 @@ const ClassRecord = () => {
     const handleOpenDialog = (record = null) => {
         if (record) {
             setEditingRecord(record);
+            // 既存の記録がある場合、typingResultから級とデータを復元
+            let typingGrade = '';
+            let typingData = {
+                basicData: { charCount: '', accuracy: '' },
+                advancedData: []
+            };
+
+            // 既存のtypingResultからデータを復元する処理
+            if (record.typingResult) {
+                try {
+                    const parsed = JSON.parse(record.typingResult);
+                    typingGrade = parsed.grade || '';
+                    typingData = parsed.data || typingData;
+                } catch (e) {
+                    // 古い形式の場合はそのまま表示
+                    typingGrade = '';
+                    typingData.basicData = { charCount: record.typingResult, accuracy: '' };
+                }
+            }
+
             setRecordForm({
                 studentId: record.studentId,
                 studentName: record.studentName,
                 date: record.date.slice(0, 10),
                 classRange: record.classRange,
-                typingResult: record.typingResult,
+                typingGrade: typingGrade,
+                typingData: typingData,
                 writingResult: record.writingResult,
                 comment: record.comment,
                 nextClassRange: record.nextClassRange,
@@ -157,7 +374,11 @@ const ClassRecord = () => {
                 studentName: selectedStudent?.name || '',
                 date: new Date().toISOString().slice(0, 10),
                 classRange: '',
-                typingResult: '',
+                typingGrade: '',
+                typingData: {
+                    basicData: { charCount: '', accuracy: '' },
+                    advancedData: []
+                },
                 writingResult: '',
                 comment: '',
                 nextClassRange: '',
@@ -195,10 +416,21 @@ const ClassRecord = () => {
         }
 
         try {
+            // タイピングデータをJSON形式で保存
+            const typingResult = recordForm.typingGrade ? JSON.stringify({
+                grade: recordForm.typingGrade,
+                data: recordForm.typingData
+            }) : '';
+
             const recordData = {
                 ...recordForm,
+                typingResult: typingResult,
                 date: new Date(recordForm.date + 'T00:00:00').toISOString()
             };
+
+            // typingGradeとtypingDataは保存しない
+            delete recordData.typingGrade;
+            delete recordData.typingData;
 
             if (editingRecord) {
                 await updateClassRecord(editingRecord.id, recordData);
@@ -342,7 +574,7 @@ const ClassRecord = () => {
 
                                         {record.typingResult && (
                                             <Typography variant="body2" color="text.secondary">
-                                                タイピング: {record.typingResult}
+                                                タイピング: {formatTypingResult(record.typingResult)}
                                             </Typography>
                                         )}
 
@@ -518,13 +750,27 @@ const ClassRecord = () => {
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="タイピング結果"
-                                    value={recordForm.typingResult}
-                                    onChange={(e) => handleFormChange('typingResult', e.target.value)}
-                                    margin="normal"
-                                    placeholder="例: 30文字/分、正確率95%"
+                                <FormControl fullWidth margin="normal" required>
+                                    <InputLabel>タイピング級 *</InputLabel>
+                                    <Select
+                                        value={recordForm.typingGrade}
+                                        label="タイピング級 *"
+                                        onChange={(e) => handleFormChange('typingGrade', e.target.value)}
+                                    >
+                                        <MenuItem value="">選択してください</MenuItem>
+                                        {TYPING_GRADES.map((grade) => (
+                                            <MenuItem key={grade} value={grade}>
+                                                {grade}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TypingResultInput
+                                    typingGrade={recordForm.typingGrade}
+                                    typingData={recordForm.typingData}
+                                    onChange={(newData) => handleFormChange('typingData', newData)}
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>

@@ -2,54 +2,90 @@ import html2canvas from 'html2canvas';
 import { format, parseISO } from 'date-fns';
 import { safeJaLocale } from './localeSetup';
 
+// タイピング結果を表示用文字列に変換する関数
+const formatTypingResultForImage = (typingResult) => {
+  if (!typingResult) return '記録なし';
+
+  try {
+    const parsed = JSON.parse(typingResult);
+    const grade = parsed.grade;
+    const data = parsed.data;
+
+    if (!grade) return '記録なし';
+
+    const isBasicGrade = ['12級', '11級', '10級'].includes(grade);
+
+    if (isBasicGrade) {
+      const charCount = data.basicData?.charCount || '';
+      const accuracy = data.basicData?.accuracy || '';
+      let result = `${grade}`;
+      if (charCount) result += ` 入力文字数: ${charCount}文字`;
+      if (accuracy) result += ` 正タイプ率: ${accuracy}`;
+      return result;
+    } else {
+      const themes = data.advancedData || [];
+      let result = `${grade}`;
+      themes.forEach((theme, index) => {
+        if (theme.theme || theme.level) {
+          result += `<br/>テーマ${index + 1}: ${theme.theme || '?'} - ${theme.level || '?'}`;
+        }
+      });
+      return result || `${grade}: 記録なし`;
+    }
+  } catch (e) {
+    // 古い形式の場合はそのまま表示
+    return typingResult;
+  }
+};
+
 // 評価シート画像生成
 export const generateEvaluationSheet = async (classRecord) => {
-    return new Promise((resolve, reject) => {
-        try {
-            // 評価シートのHTMLを動的に作成
-            const sheetHtml = createEvaluationSheetHtml(classRecord);
+  return new Promise((resolve, reject) => {
+    try {
+      // 評価シートのHTMLを動的に作成
+      const sheetHtml = createEvaluationSheetHtml(classRecord);
 
-            // 一時的にDOMに追加
-            const tempContainer = document.createElement('div');
-            tempContainer.style.position = 'fixed';
-            tempContainer.style.top = '-9999px';
-            tempContainer.style.left = '-9999px';
-            tempContainer.style.width = '800px';
-            tempContainer.style.backgroundColor = 'white';
-            tempContainer.innerHTML = sheetHtml;
+      // 一時的にDOMに追加
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.width = '800px';
+      tempContainer.style.backgroundColor = 'white';
+      tempContainer.innerHTML = sheetHtml;
 
-            document.body.appendChild(tempContainer);
+      document.body.appendChild(tempContainer);
 
-            // HTML2Canvasで画像化
-            html2canvas(tempContainer, {
-                width: 800,
-                height: 600,
-                backgroundColor: '#ffffff',
-                scale: 2,
-                useCORS: true,
-                logging: false
-            }).then(canvas => {
-                // Blobとして返す
-                canvas.toBlob((blob) => {
-                    document.body.removeChild(tempContainer);
-                    resolve(blob);
-                }, 'image/png', 0.9);
-            }).catch(error => {
-                document.body.removeChild(tempContainer);
-                reject(error);
-            });
+      // HTML2Canvasで画像化
+      html2canvas(tempContainer, {
+        width: 800,
+        height: 600,
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      }).then(canvas => {
+        // Blobとして返す
+        canvas.toBlob((blob) => {
+          document.body.removeChild(tempContainer);
+          resolve(blob);
+        }, 'image/png', 0.9);
+      }).catch(error => {
+        document.body.removeChild(tempContainer);
+        reject(error);
+      });
 
-        } catch (error) {
-            reject(error);
-        }
-    });
+    } catch (error) {
+      reject(error);
+    }
+  });
 };
 
 // 評価シートのHTMLテンプレート
 const createEvaluationSheetHtml = (record) => {
-    const formattedDate = format(parseISO(record.date), 'yyyy年MM月dd日', { locale: safeJaLocale });
+  const formattedDate = format(parseISO(record.date), 'yyyy年MM月dd日', { locale: safeJaLocale });
 
-    return `
+  return `
     <div style="
       width: 780px;
       padding: 20px;
@@ -109,7 +145,7 @@ const createEvaluationSheetHtml = (record) => {
           <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
             <div style="font-weight: bold; color: #333; margin-bottom: 8px;">タイピング結果</div>
             <div style="font-size: 16px; color: #000; min-height: 40px; line-height: 1.5;">
-              ${record.typingResult || '記録なし'}
+              ${formatTypingResultForImage(record.typingResult)}
             </div>
           </div>
           <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
@@ -155,32 +191,32 @@ const createEvaluationSheetHtml = (record) => {
 
 // PDFエクスポート（将来の拡張用）
 export const generateEvaluationSheetPDF = async (classRecord) => {
-    // jsPDFを使用したPDF生成
-    // 現在は画像生成のみ実装
-    throw new Error('PDF生成は未実装です');
+  // jsPDFを使用したPDF生成
+  // 現在は画像生成のみ実装
+  throw new Error('PDF生成は未実装です');
 };
 
 // 複数の評価シートを一括生成
 export const generateMultipleEvaluationSheets = async (classRecords) => {
-    const results = [];
+  const results = [];
 
-    for (const record of classRecords) {
-        try {
-            const blob = await generateEvaluationSheet(record);
-            results.push({
-                record,
-                blob,
-                filename: `評価シート_${record.studentName}_${format(parseISO(record.date), 'yyyyMMdd')}.png`
-            });
-        } catch (error) {
-            console.error(`評価シート生成エラー (${record.studentName}):`, error);
-            results.push({
-                record,
-                blob: null,
-                error: error.message
-            });
-        }
+  for (const record of classRecords) {
+    try {
+      const blob = await generateEvaluationSheet(record);
+      results.push({
+        record,
+        blob,
+        filename: `評価シート_${record.studentName}_${format(parseISO(record.date), 'yyyyMMdd')}.png`
+      });
+    } catch (error) {
+      console.error(`評価シート生成エラー (${record.studentName}):`, error);
+      results.push({
+        record,
+        blob: null,
+        error: error.message
+      });
     }
+  }
 
-    return results;
+  return results;
 }; 
