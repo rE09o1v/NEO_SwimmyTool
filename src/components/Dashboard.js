@@ -156,7 +156,7 @@ const Dashboard = () => {
                                                 secondary={
                                                     <Box>
                                                         <Typography variant="body2" color="textSecondary">
-                                                            {format(parseISO(record.date), 'yyyy年MM月dd日 HH:mm', { locale: safeJaLocale })}
+                                                            {format(parseISO(record.date), 'yyyy年MM月dd日', { locale: safeJaLocale })}
                                                         </Typography>
                                                         {record.comment && (
                                                             <Typography variant="body2" sx={{ mt: 0.5 }}>

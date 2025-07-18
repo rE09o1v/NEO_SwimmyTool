@@ -194,7 +194,7 @@ const createEvaluationSheetHtml = (record) => {
       <!-- フッター -->
       <div style="text-align: center; margin-top: 35px; padding-top: 15px; border-top: 2px solid #ccc;">
         <p style="margin: 0; font-size: 14px; color: #666;">
-          生成日時: ${format(new Date(), 'yyyy年MM月dd日 HH:mm')}
+          生成日時: ${format(new Date(), 'yyyy年MM月dd日')}
         </p>
       </div>
     </div>
