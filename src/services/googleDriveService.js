@@ -1,6 +1,14 @@
 // Google Drive API連携サービス
 // 注意: 実際のプロダクションでは、適切なOAuth 2.0フローと環境変数管理が必要です
 
+// 日付をローカル時間として正しくフォーマット
+const formatDateLocal = (dateString) => {
+    const localDate = new Date(dateString);
+    return localDate.getFullYear() + '-' +
+        String(localDate.getMonth() + 1).padStart(2, '0') + '-' +
+        String(localDate.getDate()).padStart(2, '0');
+};
+
 // Google Drive API設定（デモ用）
 const GOOGLE_DRIVE_CONFIG = {
     // 実際の実装では環境変数から取得
@@ -200,7 +208,7 @@ export const uploadFile = async (fileBlob, fileName, folderId = null) => {
 // 評価シート画像をGoogle Driveにアップロード
 export const uploadEvaluationSheet = async (imageBlob, classRecord) => {
     try {
-        const classDate = new Date(classRecord.date).toISOString().slice(0, 10);
+        const classDate = formatDateLocal(classRecord.date);
         const fileName = `評価シート_${classRecord.studentName}_${classDate}.png`;
 
         // フォルダ構造: 生徒管理/{生徒名}/{授業日}
@@ -274,7 +282,7 @@ export const signOutGoogleDrive = () => {
 export const mockUploadEvaluationSheet = async (imageBlob, classRecord) => {
     return new Promise((resolve) => {
         setTimeout(() => {
-            const classDate = new Date(classRecord.date).toISOString().slice(0, 10);
+            const classDate = formatDateLocal(classRecord.date);
             resolve({
                 fileId: `mock_${Date.now()}`,
                 fileName: `評価シート_${classRecord.studentName}_${classDate}.png`,

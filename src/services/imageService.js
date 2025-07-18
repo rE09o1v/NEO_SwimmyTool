@@ -50,20 +50,27 @@ export const generateEvaluationSheet = async (classRecord) => {
       tempContainer.style.position = 'fixed';
       tempContainer.style.top = '-9999px';
       tempContainer.style.left = '-9999px';
-      tempContainer.style.width = '800px';
+      tempContainer.style.width = '1200px';  // A4縦向きの幅に合わせて調整
+      tempContainer.style.height = 'auto';   // 高さは自動調整
       tempContainer.style.backgroundColor = 'white';
       tempContainer.innerHTML = sheetHtml;
 
       document.body.appendChild(tempContainer);
 
-      // HTML2Canvasで画像化
+      // 実際のコンテンツの高さを測定
+      const actualHeight = tempContainer.scrollHeight;
+      const minHeight = 1650; // A4縦向きの最小高さを調整
+      const finalHeight = Math.max(actualHeight, minHeight);
+
+      // HTML2Canvasで画像化（A4縦向きサイズ）
       html2canvas(tempContainer, {
-        width: 800,
-        height: 600,
+        width: 1200,
+        height: finalHeight,
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 1,
         useCORS: true,
-        logging: false
+        logging: false,
+        allowTaint: true
       }).then(canvas => {
         // Blobとして返す
         canvas.toBlob((blob) => {
@@ -87,101 +94,106 @@ const createEvaluationSheetHtml = (record) => {
 
   return `
     <div style="
-      width: 780px;
-      padding: 20px;
+      width: 1200px;
+      min-height: 1650px;
+      padding: 30px;
       font-family: 'Hiragino Sans', 'Yu Gothic', '游ゴシック', 'Meiryo', sans-serif;
       background-color: white;
       border: 2px solid #333;
+      box-sizing: border-box;
+      margin: 0;
     ">
       <!-- ヘッダー -->
-      <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px;">
-        <h1 style="margin: 0; font-size: 28px; color: #333;">授業評価シート</h1>
-        <p style="margin: 10px 0 0 0; font-size: 16px; color: #666;">プログラミング教室</p>
+      <div style="text-align: center; margin-bottom: 35px; border-bottom: 3px solid #333; padding-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 36px; color: #333; font-weight: bold;">授業評価シート</h1>
+        <p style="margin: 15px 0 0 0; font-size: 20px; color: #666;">プログラミング教室</p>
       </div>
-      
+    
       <!-- 基本情報 -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
-        <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <span style="font-weight: bold; color: #333; width: 80px;">生徒名:</span>
-            <span style="font-size: 18px; color: #000; border-bottom: 1px solid #333; flex: 1; padding: 5px;">${record.studentName}</span>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
+          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-weight: bold; color: #333; width: 90px; font-size: 18px;">生徒名:</span>
+            <span style="font-size: 22px; color: #000; border-bottom: 2px solid #333; flex: 1; padding: 8px;">${record.studentName}</span>
           </div>
         </div>
-        <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <span style="font-weight: bold; color: #333; width: 80px;">実施日:</span>
-            <span style="font-size: 16px; color: #000; border-bottom: 1px solid #333; flex: 1; padding: 5px;">${formattedDate}</span>
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
+          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-weight: bold; color: #333; width: 90px; font-size: 18px;">実施日:</span>
+            <span style="font-size: 20px; color: #000; border-bottom: 2px solid #333; flex: 1; padding: 8px;">${formattedDate}</span>
           </div>
         </div>
       </div>
-      
+    
       <!-- 担当者情報 -->
       ${record.instructor ? `
-      <div style="margin-bottom: 25px;">
-        <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
+      <div style="margin-bottom: 30px;">
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
           <div style="display: flex; align-items: center;">
-            <span style="font-weight: bold; color: #333; width: 80px;">担当者:</span>
-            <span style="font-size: 16px; color: #000; border-bottom: 1px solid #333; flex: 1; padding: 5px;">${record.instructor}</span>
+            <span style="font-weight: bold; color: #333; width: 90px; font-size: 18px;">担当者:</span>
+            <span style="font-size: 20px; color: #000; border-bottom: 2px solid #333; flex: 1; padding: 8px;">${record.instructor}</span>
           </div>
         </div>
       </div>
       ` : ''}
-      
+    
       <!-- 授業内容 -->
-      <div style="margin-bottom: 25px;">
-        <h3 style="background-color: #f0f8ff; padding: 10px; margin: 0 0 15px 0; border-left: 4px solid #1976d2;">授業内容</h3>
-        <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px; min-height: 60px;">
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <span style="font-weight: bold; color: #333; width: 100px;">授業範囲:</span>
-            <span style="font-size: 16px; color: #000; flex: 1; line-height: 1.5;">${record.classRange}</span>
+      <div style="margin-bottom: 30px;">
+        <h3 style="background-color: #e3f2fd; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #1976d2; font-size: 22px; color: #333;">授業内容</h3>
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px; min-height: 70px;">
+          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-weight: bold; color: #333; width: 110px; font-size: 18px;">授業範囲:</span>
+            <span style="font-size: 20px; color: #000; flex: 1; line-height: 1.6;">${record.classRange}</span>
           </div>
         </div>
       </div>
-      
+    
       <!-- 学習成果 -->
-      <div style="margin-bottom: 25px;">
-        <h3 style="background-color: #f0f8ff; padding: 10px; margin: 0 0 15px 0; border-left: 4px solid #1976d2;">学習成果</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-          <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
-            <div style="font-weight: bold; color: #333; margin-bottom: 8px;">タイピング結果</div>
-            <div style="font-size: 16px; color: #000; min-height: 40px; line-height: 1.5;">
+      <div style="margin-bottom: 30px;">
+        <h3 style="background-color: #e3f2fd; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #1976d2; font-size: 22px; color: #333;">学習成果</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
+            <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">タイピング結果</div>
+            <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
               ${formatTypingResultForImage(record.typingResult)}
             </div>
           </div>
-          <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
-            <div style="font-weight: bold; color: #333; margin-bottom: 8px;">書き取り練習結果</div>
-            <div style="font-size: 16px; color: #000; min-height: 40px; line-height: 1.5;">
+          <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
+            <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">書き取り練習結果</div>
+            <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
               ${record.writingResult || '記録なし'}
             </div>
           </div>
         </div>
       </div>
-      
-      <!-- コメント -->
-      <div style="margin-bottom: 25px;">
-        <h3 style="background-color: #f0f8ff; padding: 10px; margin: 0 0 15px 0; border-left: 4px solid #1976d2;">メンターからのコメント</h3>
-        <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px; min-height: 80px;">
-          <div style="font-size: 16px; color: #000; line-height: 1.6;">
-            ${record.comment ? record.comment.replace(/\n/g, '<br>') : 'コメントはありません'}
-          </div>
+    
+    <!-- コメント -->
+    ${record.comment ? `
+    <div style="margin-bottom: 30px;">
+      <h3 style="background-color: #e8f5e8; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #4caf50; font-size: 22px; color: #333;">指導コメント</h3>
+      <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px; min-height: 100px;">
+        <div style="font-size: 16px; color: #000; line-height: 1.8;">
+          ${record.comment.replace(/\n/g, '<br>')}
         </div>
       </div>
-      
+    </div>
+    ` : ''}
+    
       <!-- 次回予定 -->
       ${record.nextClassRange ? `
-        <div style="margin-bottom: 20px;">
-          <h3 style="background-color: #fff8f0; padding: 10px; margin: 0 0 15px 0; border-left: 4px solid #ff9800;">次回の予定</h3>
-          <div style="border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
-            <div style="font-size: 16px; color: #000; line-height: 1.5;">
+        <div style="margin-bottom: 15px;">
+          <h3 style="background-color: #fff3e0; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #ff9800; font-size: 22px; color: #333;">次回の授業予定</h3>
+          <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
+            <div style="font-size: 18px; color: #000; line-height: 1.6;">
               ${record.nextClassRange}
             </div>
           </div>
         </div>
       ` : ''}
-      
+    
       <!-- フッター -->
-      <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc;">
-        <p style="margin: 0; font-size: 12px; color: #666;">
+      <div style="text-align: center; margin-top: 35px; padding-top: 15px; border-top: 2px solid #ccc;">
+        <p style="margin: 0; font-size: 14px; color: #666;">
           生成日時: ${format(new Date(), 'yyyy年MM月dd日 HH:mm')}
         </p>
       </div>

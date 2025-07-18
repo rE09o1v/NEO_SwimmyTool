@@ -259,10 +259,18 @@ const ClassRecord = () => {
     const [editingRecord, setEditingRecord] = useState(null);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
+    // 日付をローカル時間でフォーマット
+    const formatDateLocal = (date = new Date()) => {
+        const targetDate = date || new Date();
+        return targetDate.getFullYear() + '-' +
+            String(targetDate.getMonth() + 1).padStart(2, '0') + '-' +
+            String(targetDate.getDate()).padStart(2, '0');
+    };
+
     const [recordForm, setRecordForm] = useState({
         studentId: '',
         studentName: '',
-        date: new Date().toISOString().slice(0, 10),
+        date: formatDateLocal(),
         classRange: '',
         typingGrade: '',
         typingData: {
@@ -355,10 +363,13 @@ const ClassRecord = () => {
                 }
             }
 
+            // 日付をローカル時間として正しく表示
+            const formattedDate = formatDateLocal(new Date(record.date));
+
             setRecordForm({
                 studentId: record.studentId,
                 studentName: record.studentName,
-                date: record.date.slice(0, 10),
+                date: formattedDate,
                 classRange: record.classRange,
                 typingGrade: typingGrade,
                 typingData: typingData,
@@ -369,10 +380,13 @@ const ClassRecord = () => {
             });
         } else {
             setEditingRecord(null);
+            // 今日の日付をローカル時間で取得
+            const todayFormatted = formatDateLocal();
+
             setRecordForm({
                 studentId: selectedStudent?.id || '',
                 studentName: selectedStudent?.name || '',
-                date: new Date().toISOString().slice(0, 10),
+                date: todayFormatted,
                 classRange: '',
                 typingGrade: '',
                 typingData: {
@@ -422,10 +436,14 @@ const ClassRecord = () => {
                 data: recordForm.typingData
             }) : '';
 
+            // 日付をローカル時間として保存（JST維持）
+            const [year, month, day] = recordForm.date.split('-');
+            const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+
             const recordData = {
                 ...recordForm,
                 typingResult: typingResult,
-                date: new Date(recordForm.date + 'T00:00:00').toISOString()
+                date: localDate.toISOString()
             };
 
             // typingGradeとtypingDataは保存しない
