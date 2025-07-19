@@ -30,7 +30,9 @@ import {
     Paper,
     Divider,
     LinearProgress,
-    Fab
+    Fab,
+    Checkbox,
+    FormControlLabel
 } from '@mui/material';
 import {
     Add,
@@ -110,6 +112,23 @@ const formatTypingResult = (typingResult) => {
         // 古い形式の場合はそのまま表示
         return typingResult;
     }
+};
+
+// 書き取り結果を表示用文字列に変換する関数
+const formatWritingResultForDisplay = (record) => {
+    // 新形式のデータがある場合
+    if (record.writingStep !== undefined && record.writingType !== undefined) {
+        const step = record.writingStep ? `STEP${record.writingStep}` : '';
+        const type = record.writingType && record.writingType.length > 0 ? record.writingType.join('・') : '';
+        return [step, type].filter(Boolean).join(' - ');
+    }
+
+    // 旧形式のデータがある場合（後方互換性）
+    if (record.writingResult) {
+        return record.writingResult;
+    }
+
+    return '記録なし';
 };
 
 // タイピング結果入力コンポーネント
@@ -329,7 +348,8 @@ const ClassRecord = () => {
             },
             advancedData: []
         },
-        writingResult: '',
+        writingStep: '',
+        writingType: [],
         comment: '',
         nextClassRange: '',
         instructor: ''
@@ -418,6 +438,20 @@ const ClassRecord = () => {
             // 日付をローカル時間として正しく表示
             const formattedDate = formatDateLocal(new Date(record.date));
 
+            // 書き取り結果の復元処理（後方互換性のため）
+            let writingStep = '';
+            let writingType = [];
+
+            if (record.writingStep !== undefined && record.writingType !== undefined) {
+                // 新形式のデータ
+                writingStep = record.writingStep;
+                writingType = record.writingType || [];
+            } else if (record.writingResult) {
+                // 旧形式のデータを新形式に変換（デフォルト値）
+                writingStep = '1'; // デフォルトでSTEP1
+                writingType = ['練習']; // デフォルトで練習
+            }
+
             setRecordForm({
                 studentId: record.studentId,
                 studentName: record.studentName,
@@ -425,7 +459,8 @@ const ClassRecord = () => {
                 classRange: record.classRange,
                 typingGrade: typingGrade,
                 typingData: typingData,
-                writingResult: record.writingResult,
+                writingStep: writingStep,
+                writingType: writingType,
                 comment: record.comment,
                 nextClassRange: record.nextClassRange,
                 instructor: record.instructor || ''
@@ -462,7 +497,8 @@ const ClassRecord = () => {
                 classRange: '',
                 typingGrade: defaultTypingGrade,
                 typingData: defaultTypingData,
-                writingResult: '',
+                writingStep: '',
+                writingType: [],
                 comment: '',
                 nextClassRange: '',
                 instructor: currentUser?.name || ''
@@ -529,6 +565,12 @@ const ClassRecord = () => {
                 data: recordForm.typingData
             }) : '';
 
+            // 書き取り結果を後方互換性のため文字列にも変換
+            const writingResult = formatWritingResultForDisplay({
+                writingStep: recordForm.writingStep,
+                writingType: recordForm.writingType
+            });
+
             // 日付をローカル時間として保存（JST維持）
             const [year, month, day] = recordForm.date.split('-');
             const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -536,6 +578,7 @@ const ClassRecord = () => {
             const recordData = {
                 ...recordForm,
                 typingResult: typingResult,
+                writingResult: writingResult, // 後方互換性のため
                 date: localDate.toISOString()
             };
 
@@ -689,9 +732,9 @@ const ClassRecord = () => {
                                             </Typography>
                                         )}
 
-                                        {record.writingResult && (
+                                        {(record.writingStep || record.writingType?.length > 0 || record.writingResult) && (
                                             <Typography variant="body2" color="text.secondary">
-                                                書き取り: {record.writingResult}
+                                                書き取り: {formatWritingResultForDisplay(record)}
                                             </Typography>
                                         )}
 
@@ -904,14 +947,54 @@ const ClassRecord = () => {
                                 </Box>
                             </Grid>
                             <Grid item xs={12} md={6}>
-                                <TextField
-                                    fullWidth
-                                    label="書き取り練習結果"
-                                    value={recordForm.writingResult}
-                                    onChange={(e) => handleFormChange('writingResult', e.target.value)}
-                                    margin="normal"
-                                    placeholder="例: 10問中8問正解"
-                                />
+                                <FormControl fullWidth margin="normal">
+                                    <InputLabel>書き取りSTEP</InputLabel>
+                                    <Select
+                                        value={recordForm.writingStep}
+                                        label="書き取りSTEP"
+                                        onChange={(e) => handleFormChange('writingStep', e.target.value)}
+                                    >
+                                        <MenuItem value="">選択してください</MenuItem>
+                                        <MenuItem value="1">STEP1</MenuItem>
+                                        <MenuItem value="2">STEP2</MenuItem>
+                                        <MenuItem value="3">STEP3</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Box sx={{ mt: 2 }}>
+                                    <Typography variant="body2" sx={{ mb: 1 }}>書き取り種類</Typography>
+                                    <Box sx={{ display: 'flex', gap: 2 }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={recordForm.writingType.includes('練習')}
+                                                    onChange={(e) => {
+                                                        const newTypes = e.target.checked
+                                                            ? [...recordForm.writingType, '練習']
+                                                            : recordForm.writingType.filter(type => type !== '練習');
+                                                        handleFormChange('writingType', newTypes);
+                                                    }}
+                                                />
+                                            }
+                                            label="練習"
+                                        />
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={recordForm.writingType.includes('テスト')}
+                                                    onChange={(e) => {
+                                                        const newTypes = e.target.checked
+                                                            ? [...recordForm.writingType, 'テスト']
+                                                            : recordForm.writingType.filter(type => type !== 'テスト');
+                                                        handleFormChange('writingType', newTypes);
+                                                    }}
+                                                />
+                                            }
+                                            label="テスト"
+                                        />
+                                    </Box>
+                                </Box>
                             </Grid>
                             <Grid item xs={12}>
                                 <Box display="flex" alignItems="center" gap={1}>

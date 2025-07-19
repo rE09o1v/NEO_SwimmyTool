@@ -69,6 +69,23 @@ const formatPreviousTypingResult = (previousResult) => {
   }
 };
 
+// 書き取り結果を画像用に表示する関数
+const formatWritingResultForImage = (record) => {
+  // 新形式のデータがある場合
+  if (record.writingStep !== undefined && record.writingType !== undefined) {
+    const step = record.writingStep ? `STEP${record.writingStep}` : '';
+    const type = record.writingType && record.writingType.length > 0 ? record.writingType.join('・') : '';
+    return [step, type].filter(Boolean).join(' - ') || '記録なし';
+  }
+
+  // 旧形式のデータがある場合（後方互換性）
+  if (record.writingResult) {
+    return record.writingResult;
+  }
+
+  return '記録なし';
+};
+
 // 評価シート画像生成
 export const generateEvaluationSheet = async (classRecord) => {
   return new Promise(async (resolve, reject) => {
@@ -234,7 +251,7 @@ const createEvaluationSheetHtml = (record, previousResult = null) => {
         <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
           <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">書き取り練習結果</div>
           <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
-            ${record.writingResult || '記録なし'}
+            ${formatWritingResultForImage(record)}
           </div>
         </div>
       </div>
