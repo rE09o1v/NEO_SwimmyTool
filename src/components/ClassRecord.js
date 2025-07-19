@@ -1082,9 +1082,24 @@ const ClassRecord = () => {
                     {classRecords.length > 0 ? (
                         classRecords.map((record) => (
                             <Grid item xs={12} md={6} lg={4} key={record.id}>
-                                <Card sx={{ cursor: 'pointer' }} onClick={() => handleOpenDetail(record)}>
-                                    <CardContent>
-                                        <Box display="flex" justifyContent="space-between" alignItems="start" mb={2}>
+                                <Card 
+                                    sx={{ 
+                                        cursor: 'pointer',
+                                        height: 350,
+                                        display: 'flex',
+                                        flexDirection: 'column'
+                                    }} 
+                                    onClick={() => handleOpenDetail(record)}
+                                >
+                                    <CardContent sx={{ 
+                                        display: 'flex', 
+                                        flexDirection: 'column', 
+                                        height: '100%',
+                                        pb: 1
+                                    }}>
+                                        {/* コンテンツエリア */}
+                                        <Box sx={{ flexGrow: 1 }}>
+                                            <Box display="flex" justifyContent="space-between" alignItems="start" mb={2}>
                                             <Typography variant="h6" component="div">
                                                 {record.studentName}
                                             </Typography>
@@ -1132,8 +1147,8 @@ const ClassRecord = () => {
                                                         ? comments.join(' ') 
                                                         : record.comment || '';
                                                     
-                                                    return displayText.length > 80
-                                                        ? `${displayText.substring(0, 80)}...`
+                                                    return displayText.length > 60
+                                                        ? `${displayText.substring(0, 60)}...`
                                                         : displayText;
                                                 })()}
                                             </Typography>
@@ -1196,7 +1211,9 @@ const ClassRecord = () => {
                                                 </Box>
                                             </Box>
                                         )}
+                                        </Box>
 
+                                        {/* 操作ボタンエリア */}
                                         <Box display="flex" justifyContent="space-between" mt={2}>
                                             <Box>
                                                 <IconButton
