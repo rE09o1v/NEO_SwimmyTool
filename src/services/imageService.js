@@ -204,20 +204,9 @@ const createEvaluationSheetHtml = (record, previousResult = null) => {
       </div>
       ` : ''}
     
-      <!-- 授業内容 -->
-      <div style="margin-bottom: 30px;">
-        <h3 style="background-color: #e3f2fd; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #1976d2; font-size: 22px; color: #333;">授業内容</h3>
-        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px; min-height: 70px;">
-          <div style="display: flex; align-items: center; margin-bottom: 12px;">
-            <span style="font-weight: bold; color: #333; width: 110px; font-size: 18px;">授業範囲:</span>
-            <span style="font-size: 20px; color: #000; flex: 1; line-height: 1.6;">${record.classRange}</span>
-          </div>
-        </div>
-      </div>
-    
       <!-- 学習成果 -->
       <div style="margin-bottom: 30px;">
-        <h3 style="background-color: #e3f2fd; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #1976d2; font-size: 22px; color: #333;">学習成果</h3>
+        <h3 style="background-color: #e8f5e8; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #4caf50; font-size: 22px; color: #333;">学習成果</h3>
         
         <!-- タイピング結果 -->
         <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px; margin-bottom: 20px;">
@@ -252,6 +241,17 @@ const createEvaluationSheetHtml = (record, previousResult = null) => {
           <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">書き取り練習結果</div>
           <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
             ${formatWritingResultForImage(record)}
+          </div>
+        </div>
+      </div>
+
+      <!-- 授業内容 -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="background-color: #e3f2fd; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #1976d2; font-size: 22px; color: #333;">授業内容</h3>
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px; min-height: 70px;">
+          <div style="display: flex; align-items: center; margin-bottom: 12px;">
+            <span style="font-weight: bold; color: #333; width: 110px; font-size: 18px;">授業範囲:</span>
+            <span style="font-size: 20px; color: #000; flex: 1; line-height: 1.6;">${record.classRange}</span>
           </div>
         </div>
       </div>
