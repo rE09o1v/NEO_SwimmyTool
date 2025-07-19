@@ -250,7 +250,7 @@ const StudentManagement = () => {
                             <TableCell>年齢</TableCell>
                             <TableCell>コース</TableCell>
                             <TableCell>Google Driveフォルダ</TableCell>
-                            <TableCell align="center">操作</TableCell>
+                            <TableCell align="center" sx={{ minWidth: 200 }}>操作</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -266,13 +266,15 @@ const StudentManagement = () => {
                                         </Typography>
                                     </TableCell>
                                     <TableCell align="center">
-                                        <IconButton
+                                        <Button
                                             size="small"
+                                            variant="outlined"
+                                            startIcon={<Assignment />}
                                             onClick={() => handleViewClassRecords(student)}
-                                            title="授業記録を見る"
+                                            sx={{ mr: 1, mb: 1 }}
                                         >
-                                            <Assignment />
-                                        </IconButton>
+                                            授業記録
+                                        </Button>
                                         <IconButton
                                             size="small"
                                             onClick={() => handleOpenDialog(student)}

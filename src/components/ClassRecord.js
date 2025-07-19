@@ -565,6 +565,13 @@ const ClassRecord = () => {
         loadData();
     }, [studentId]);
 
+    // 生徒が選択されていない場合、統計タブが選択されていたら授業記録一覧タブに戻す
+    useEffect(() => {
+        if (!selectedStudent && tabValue === 1) {
+            setTabValue(0);
+        }
+    }, [selectedStudent, tabValue]);
+
     // テーマ別推移の初期値設定
     useEffect(() => {
         if (classRecords.length > 0) {
@@ -1035,9 +1042,16 @@ const ClassRecord = () => {
     return (
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4">
-                    {selectedStudent ? `${selectedStudent.name}さんの授業記録` : '授業記録'}
-                </Typography>
+                <Box>
+                    <Typography variant="h4">
+                        {selectedStudent ? `${selectedStudent.name}さんの授業記録` : '授業記録'}
+                    </Typography>
+                    {!selectedStudent && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            特定の生徒の統計情報を見るには、生徒管理から個別の授業記録にアクセスしてください
+                        </Typography>
+                    )}
+                </Box>
                 <Button
                     variant="contained"
                     startIcon={<Add />}
@@ -1052,13 +1066,13 @@ const ClassRecord = () => {
             {/* タブ */}
             <Paper sx={{ mb: 3 }}>
                 <Tabs
-                    value={tabValue}
+                    value={selectedStudent ? tabValue : 0}
                     onChange={(e, newValue) => setTabValue(newValue)}
                     indicatorColor="primary"
                     textColor="primary"
                 >
                     <Tab label="授業記録一覧" />
-                    <Tab label="統計情報" />
+                    {selectedStudent && <Tab label="統計情報" />}
                 </Tabs>
             </Paper>
 

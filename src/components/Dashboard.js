@@ -199,10 +199,15 @@ const Dashboard = () => {
                             {students.length > 0 ? (
                                 <List>
                                     {students.slice(0, 5).map((student, index) => (
-                                        <ListItem key={student.id} divider={index < 4}>
+                                        <ListItem 
+                                            key={student.id} 
+                                            divider={index < 4}
+                                            button
+                                            onClick={() => navigate(`/class-record/${student.id}`)}
+                                        >
                                             <ListItemText
                                                 primary={student.name}
-                                                secondary={`${student.age}歳 - ${student.course}`}
+                                                secondary={`${student.age}歳 - ${student.course} (クリックで授業記録を見る)`}
                                             />
                                         </ListItem>
                                     ))}
