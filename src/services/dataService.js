@@ -350,25 +350,25 @@ export const initializeDemoData = async () => {
         if (mentors.length === 0) {
             const demoMentors = [
                 {
-                    name: 'メンター田中',
-                    email: 'tanaka@example.com',
-                    speciality: 'スクラッチプログラミング',
+                    lastName: '田中',
+                    firstName: '太郎',
+                    emergencyContact: '090-1234-5678',
                     status: 'active',
-                    joinDate: '2024-01-15'
+                    name: '田中' // 授業記録で使用
                 },
                 {
-                    name: 'スタッフ佐藤',
-                    email: 'sato@example.com',
-                    speciality: 'ロボットプログラミング',
+                    lastName: '佐藤',
+                    firstName: '花子',
+                    emergencyContact: 'sato@example.com',
                     status: 'active',
-                    joinDate: '2024-02-01'
+                    name: '佐藤' // 授業記録で使用
                 },
                 {
-                    name: 'メンター鈴木',
-                    email: 'suzuki@example.com',
-                    speciality: 'Pythonプログラミング',
+                    lastName: '鈴木',
+                    firstName: '一郎',
+                    emergencyContact: '080-9876-5432',
                     status: 'active',
-                    joinDate: '2024-03-10'
+                    name: '鈴木' // 授業記録で使用
                 }
             ];
 
@@ -404,19 +404,11 @@ export const addMentor = async (mentorData) => {
             try {
                 const mentors = await getMentors();
 
-                // 重複チェック
-                const existingMentor = mentors.find(m => m.email === mentorData.email);
-                if (existingMentor) {
-                    reject(new Error('このメールアドレスは既に登録されています'));
-                    return;
-                }
-
                 const newMentor = {
                     id: generateId(),
                     ...mentorData,
                     createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    status: 'active'
+                    updatedAt: new Date().toISOString()
                 };
 
                 mentors.push(newMentor);
@@ -439,15 +431,6 @@ export const updateMentor = async (id, mentorData) => {
                 if (index === -1) {
                     reject(new Error('メンターが見つかりません'));
                     return;
-                }
-
-                // メールアドレスの重複チェック（自分以外）
-                if (mentorData.email) {
-                    const existingMentor = mentors.find(m => m.email === mentorData.email && m.id !== id);
-                    if (existingMentor) {
-                        reject(new Error('このメールアドレスは既に登録されています'));
-                        return;
-                    }
                 }
 
                 mentors[index] = {
@@ -489,11 +472,16 @@ export const deleteMentor = async (id) => {
 
 export const searchMentors = async (query) => {
     const mentors = await getMentors();
-    return mentors.filter(mentor =>
-        mentor.name.toLowerCase().includes(query.toLowerCase()) ||
-        mentor.email.toLowerCase().includes(query.toLowerCase()) ||
-        mentor.speciality.toLowerCase().includes(query.toLowerCase())
-    );
+    return mentors.filter(mentor => {
+        const searchTarget = [
+            mentor.lastName || '',
+            mentor.firstName || '',
+            mentor.emergencyContact || '',
+            mentor.name || '' // 既存データ互換性のため
+        ].join(' ').toLowerCase();
+        
+        return searchTarget.includes(query.toLowerCase());
+    });
 };
 
 // 前回のタイピング結果を取得する関数

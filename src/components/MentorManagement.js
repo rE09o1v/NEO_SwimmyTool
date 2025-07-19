@@ -37,9 +37,6 @@ import {
     Delete,
     Search,
     PersonAdd,
-    Email,
-    Work,
-    CalendarToday,
     CheckCircle,
     Cancel
 } from '@mui/icons-material';
@@ -58,24 +55,12 @@ const MentorManagement = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [editingMentor, setEditingMentor] = useState(null);
     const [mentorForm, setMentorForm] = useState({
-        name: '',
-        email: '',
-        speciality: '',
-        status: 'active',
-        joinDate: new Date().toISOString().slice(0, 10)
+        lastName: '',
+        firstName: '',
+        emergencyContact: '',
+        status: 'active'
     });
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
-    const specialities = [
-        'スクラッチプログラミング',
-        'ロボットプログラミング',
-        'Pythonプログラミング',
-        'ウェブプログラミング',
-        'ゲーム制作',
-        'アプリ開発',
-        '3Dモデリング',
-        'AI・機械学習'
-    ];
 
     const statuses = [
         { value: 'active', label: '稼働中', color: 'success' },
@@ -128,20 +113,18 @@ const MentorManagement = () => {
         if (mentor) {
             setEditingMentor(mentor);
             setMentorForm({
-                name: mentor.name,
-                email: mentor.email,
-                speciality: mentor.speciality,
-                status: mentor.status,
-                joinDate: mentor.joinDate
+                lastName: mentor.lastName || mentor.name || '', // 既存データ互換性
+                firstName: mentor.firstName || '',
+                emergencyContact: mentor.emergencyContact || '',
+                status: mentor.status
             });
         } else {
             setEditingMentor(null);
             setMentorForm({
-                name: '',
-                email: '',
-                speciality: '',
-                status: 'active',
-                joinDate: new Date().toISOString().slice(0, 10)
+                lastName: '',
+                firstName: '',
+                emergencyContact: '',
+                status: 'active'
             });
         }
         setOpenDialog(true);
@@ -150,20 +133,32 @@ const MentorManagement = () => {
     const handleCloseDialog = () => {
         setOpenDialog(false);
         setEditingMentor(null);
+        setMentorForm({
+            lastName: '',
+            firstName: '',
+            emergencyContact: '',
+            status: 'active'
+        });
     };
 
     const handleSubmit = async () => {
-        if (!mentorForm.name || !mentorForm.email || !mentorForm.speciality) {
-            showSnackbar('必須項目を入力してください', 'error');
+        if (!mentorForm.lastName || !mentorForm.firstName) {
+            showSnackbar('姓と名は必須項目です', 'error');
             return;
         }
 
         try {
+            // 授業記録で使用するためのname（姓のみ）を追加
+            const mentorData = {
+                ...mentorForm,
+                name: mentorForm.lastName // 授業記録で使用
+            };
+
             if (editingMentor) {
-                await updateMentor(editingMentor.id, mentorForm);
+                await updateMentor(editingMentor.id, mentorData);
                 showSnackbar('メンター情報を更新しました');
             } else {
-                await addMentor(mentorForm);
+                await addMentor(mentorData);
                 showSnackbar('新しいメンターを追加しました');
             }
             
@@ -175,7 +170,10 @@ const MentorManagement = () => {
     };
 
     const handleDelete = async (mentor) => {
-        if (window.confirm(`${mentor.name}さんを削除してもよろしいですか？\n\n※この操作は取り消せません。`)) {
+        const displayName = mentor.lastName && mentor.firstName 
+            ? `${mentor.lastName} ${mentor.firstName}`
+            : mentor.name;
+        if (window.confirm(`${displayName}さんを削除してもよろしいですか？\n\n※この操作は取り消せません。`)) {
             try {
                 await deleteMentor(mentor.id);
                 showSnackbar('メンターを削除しました');
@@ -195,11 +193,6 @@ const MentorManagement = () => {
 
     const getStatusInfo = (status) => {
         return statuses.find(s => s.value === status) || statuses[0];
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString('ja-JP');
     };
 
 
@@ -227,7 +220,7 @@ const MentorManagement = () => {
                             <TextField
                                 fullWidth
                                 label="メンター検索"
-                                placeholder="名前、メール、専門分野で検索..."
+                                placeholder="姓、名、緊急連絡先で検索..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -262,11 +255,10 @@ const MentorManagement = () => {
                 <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>メンター名</TableCell>
-                                <TableCell>メールアドレス</TableCell>
-                                <TableCell>専門分野</TableCell>
+                                <TableCell>姓</TableCell>
+                                <TableCell>名</TableCell>
+                                <TableCell>緊急連絡先</TableCell>
                                 <TableCell>ステータス</TableCell>
-                                <TableCell>入社日</TableCell>
                                 <TableCell align="center">操作</TableCell>
                             </TableRow>
                         </TableHead>
@@ -278,22 +270,16 @@ const MentorManagement = () => {
                                         <TableCell>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                 <Avatar sx={{ width: 32, height: 32 }}>
-                                                    {mentor.name.charAt(0)}
+                                                    {(mentor.lastName || mentor.name || '').charAt(0)}
                                                 </Avatar>
-                                                {mentor.name}
+                                                {mentor.lastName || mentor.name || ''}
                                             </Box>
                                         </TableCell>
                                         <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Email fontSize="small" color="action" />
-                                                {mentor.email}
-                                            </Box>
+                                            {mentor.firstName || ''}
                                         </TableCell>
                                         <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Work fontSize="small" color="action" />
-                                                {mentor.speciality}
-                                            </Box>
+                                            {mentor.emergencyContact || ''}
                                         </TableCell>
                                         <TableCell>
                                             <Chip
@@ -302,12 +288,6 @@ const MentorManagement = () => {
                                                 size="small"
                                                 icon={mentor.status === 'active' ? <CheckCircle /> : <Cancel />}
                                             />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <CalendarToday fontSize="small" color="action" />
-                                                {formatDate(mentor.joinDate)}
-                                            </Box>
                                         </TableCell>
                                         <TableCell align="center">
                                             <IconButton
@@ -330,7 +310,7 @@ const MentorManagement = () => {
                             })}
                             {mentors.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                                         <Typography color="textSecondary">
                                             メンターが見つかりません
                                         </Typography>
@@ -368,42 +348,34 @@ const MentorManagement = () => {
                 </DialogTitle>
                 <DialogContent>
                     <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sm={6}>
                             <TextField
-                                label="メンター名"
+                                label="姓"
                                 fullWidth
                                 required
-                                value={mentorForm.name}
-                                onChange={(e) => handleFormChange('name', e.target.value)}
+                                value={mentorForm.lastName}
+                                onChange={(e) => handleFormChange('lastName', e.target.value)}
                             />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                label="メールアドレス"
-                                type="email"
-                                fullWidth
-                                required
-                                value={mentorForm.email}
-                                onChange={(e) => handleFormChange('email', e.target.value)}
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <FormControl fullWidth required>
-                                <InputLabel>専門分野</InputLabel>
-                                <Select
-                                    value={mentorForm.speciality}
-                                    label="専門分野"
-                                    onChange={(e) => handleFormChange('speciality', e.target.value)}
-                                >
-                                    {specialities.map((speciality) => (
-                                        <MenuItem key={speciality} value={speciality}>
-                                            {speciality}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
                         </Grid>
                         <Grid item xs={12} sm={6}>
+                            <TextField
+                                label="名"
+                                fullWidth
+                                required
+                                value={mentorForm.firstName}
+                                onChange={(e) => handleFormChange('firstName', e.target.value)}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                label="緊急連絡先"
+                                fullWidth
+                                value={mentorForm.emergencyContact}
+                                onChange={(e) => handleFormChange('emergencyContact', e.target.value)}
+                                placeholder="電話番号またはメールアドレス"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
                             <FormControl fullWidth>
                                 <InputLabel>ステータス</InputLabel>
                                 <Select
@@ -418,18 +390,6 @@ const MentorManagement = () => {
                                     ))}
                                 </Select>
                             </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="入社日"
-                                type="date"
-                                fullWidth
-                                value={mentorForm.joinDate}
-                                onChange={(e) => handleFormChange('joinDate', e.target.value)}
-                                InputLabelProps={{
-                                    shrink: true,
-                                }}
-                            />
                         </Grid>
                     </Grid>
                 </DialogContent>

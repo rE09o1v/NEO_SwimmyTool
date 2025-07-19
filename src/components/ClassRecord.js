@@ -1817,7 +1817,7 @@ const ClassRecord = () => {
                                             .filter(mentor => mentor.status === 'active')
                                             .map((mentor) => (
                                                 <MenuItem key={mentor.id} value={mentor.name}>
-                                                    {mentor.name} ({mentor.speciality})
+                                                    {mentor.name}
                                                 </MenuItem>
                                             ))
                                         }
