@@ -515,6 +515,8 @@ const ClassRecord = () => {
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
+    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [openTemplateTypeDialog, setOpenTemplateTypeDialog] = useState(false);
     const [editingRecord, setEditingRecord] = useState(null);
     const [openDetailDialog, setOpenDetailDialog] = useState(false);
     const [detailRecord, setDetailRecord] = useState(null);
@@ -543,7 +545,8 @@ const ClassRecord = () => {
         },
         writingStep: '',
         writingType: [],
-        comment: '',
+        typingComment: '', // タイピングについてのコメント
+        curriculumComment: '', // カリキュラムについてのコメント
         nextClassRange: '',
         instructor: '',
         images: [] // 成果物画像配列を追加
@@ -676,7 +679,8 @@ const ClassRecord = () => {
                 typingData: typingData,
                 writingStep: writingStep,
                 writingType: writingType,
-                comment: record.comment,
+                typingComment: record.typingComment || '',
+                curriculumComment: record.curriculumComment || record.comment || '', // 既存データ互換性のため
                 nextClassRange: record.nextClassRange,
                 instructor: record.instructor || '',
                 images: record.images || [] // 既存の画像を読み込み
@@ -718,7 +722,8 @@ const ClassRecord = () => {
                 typingData: defaultTypingData,
                 writingStep: '',
                 writingType: [],
-                comment: '',
+                typingComment: '',
+                curriculumComment: '',
                 nextClassRange: '',
                 instructor: currentUser?.name || '',
                 images: [] // 新規作成時は空の画像配列
@@ -751,7 +756,8 @@ const ClassRecord = () => {
             },
             writingStep: '',
             writingType: [],
-            comment: '',
+            typingComment: '',
+            curriculumComment: '',
             nextClassRange: '',
             instructor: '',
             images: []
@@ -871,8 +877,15 @@ const ClassRecord = () => {
             const [year, month, day] = recordForm.date.split('-');
             const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
 
+            // コメントを統合（後方互換性のため）
+            const combinedComment = [
+                recordForm.typingComment && `【タイピング】\n${recordForm.typingComment}`,
+                recordForm.curriculumComment && `【カリキュラム】\n${recordForm.curriculumComment}`
+            ].filter(Boolean).join('\n\n');
+
             const recordData = {
                 ...recordForm,
+                comment: combinedComment, // 後方互換性のため統合コメントも保存
                 typingResult: typingResult,
                 writingResult: writingResult, // 後方互換性のため
                 date: localDate.toISOString()
@@ -981,14 +994,24 @@ const ClassRecord = () => {
         }
     };
 
-    const handleUseTemplate = (template) => {
-        const currentComment = recordForm.comment;
-        const newComment = currentComment
-            ? `${currentComment}\n${template.text}`
-            : template.text;
-
-        handleFormChange('comment', newComment);
+    const handleTemplateClick = (template) => {
+        setSelectedTemplate(template);
         setOpenTemplateDialog(false);
+        setOpenTemplateTypeDialog(true);
+    };
+
+    const handleUseTemplate = (commentType) => {
+        if (!selectedTemplate) return;
+        
+        const currentComment = commentType === 'typing' ? recordForm.typingComment : recordForm.curriculumComment;
+        const newComment = currentComment
+            ? `${currentComment}\n${selectedTemplate.text}`
+            : selectedTemplate.text;
+
+        const fieldName = commentType === 'typing' ? 'typingComment' : 'curriculumComment';
+        handleFormChange(fieldName, newComment);
+        setOpenTemplateTypeDialog(false);
+        setSelectedTemplate(null);
     };
 
     const handleOpenDetail = (record) => {
@@ -1080,12 +1103,25 @@ const ClassRecord = () => {
                                             </Typography>
                                         )}
 
-                                        {record.comment && (
+                                        {(record.typingComment || record.curriculumComment || record.comment) && (
                                             <Typography variant="body2" sx={{ mt: 1 }}>
-                                                {record.comment.length > 80
-                                                    ? `${record.comment.substring(0, 80)}...`
-                                                    : record.comment
-                                                }
+                                                {(() => {
+                                                    const comments = [];
+                                                    if (record.typingComment) {
+                                                        comments.push(`【T】${record.typingComment}`);
+                                                    }
+                                                    if (record.curriculumComment) {
+                                                        comments.push(`【C】${record.curriculumComment}`);
+                                                    }
+                                                    
+                                                    let displayText = comments.length > 0 
+                                                        ? comments.join(' ') 
+                                                        : record.comment || '';
+                                                    
+                                                    return displayText.length > 80
+                                                        ? `${displayText.substring(0, 80)}...`
+                                                        : displayText;
+                                                })()}
                                             </Typography>
                                         )}
 
@@ -1876,16 +1912,37 @@ const ClassRecord = () => {
                                     </Box>
                                 </Box>
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={12} md={6}>
                                 <Box display="flex" alignItems="center" gap={1}>
                                     <TextField
                                         fullWidth
-                                        label="コメント"
-                                        value={recordForm.comment}
-                                        onChange={(e) => handleFormChange('comment', e.target.value)}
+                                        label="タイピングについてのコメント"
+                                        value={recordForm.typingComment}
+                                        onChange={(e) => handleFormChange('typingComment', e.target.value)}
                                         margin="normal"
                                         multiline
                                         rows={3}
+                                        placeholder="タイピングの成果、課題、次回への改善点など"
+                                    />
+                                    <IconButton
+                                        onClick={() => setOpenTemplateDialog(true)}
+                                        title="テンプレートを使用"
+                                    >
+                                        <Template />
+                                    </IconButton>
+                                </Box>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    <TextField
+                                        fullWidth
+                                        label="カリキュラムについてのコメント"
+                                        value={recordForm.curriculumComment}
+                                        onChange={(e) => handleFormChange('curriculumComment', e.target.value)}
+                                        margin="normal"
+                                        multiline
+                                        rows={3}
+                                        placeholder="授業の理解度、進捗、次回の予定など"
                                     />
                                     <IconButton
                                         onClick={() => setOpenTemplateDialog(true)}
@@ -1980,6 +2037,42 @@ const ClassRecord = () => {
                 </DialogActions>
             </Dialog>
 
+            {/* コメント種類選択ダイアログ */}
+            <Dialog open={openTemplateTypeDialog} onClose={() => setOpenTemplateTypeDialog(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>コメントを追加する欄を選択</DialogTitle>
+                <DialogContent>
+                    {selectedTemplate && (
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                選択したテンプレート:
+                            </Typography>
+                            <Typography variant="body1" sx={{ p: 1, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                                {selectedTemplate.text}
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ flexDirection: 'column', gap: 1 }}>
+                    <Button 
+                        fullWidth 
+                        variant="outlined" 
+                        onClick={() => handleUseTemplate('typing')}
+                        sx={{ mb: 1 }}
+                    >
+                        タイピングについてのコメント欄に追加
+                    </Button>
+                    <Button 
+                        fullWidth 
+                        variant="outlined" 
+                        onClick={() => handleUseTemplate('curriculum')}
+                        sx={{ mb: 1 }}
+                    >
+                        カリキュラムについてのコメント欄に追加
+                    </Button>
+                    <Button onClick={() => setOpenTemplateTypeDialog(false)}>キャンセル</Button>
+                </DialogActions>
+            </Dialog>
+
             {/* コメントテンプレートダイアログ */}
             <Dialog open={openTemplateDialog} onClose={() => setOpenTemplateDialog(false)} maxWidth="sm" fullWidth>
                 <DialogTitle>コメントテンプレート</DialogTitle>
@@ -1994,7 +2087,7 @@ const ClassRecord = () => {
                                     <ListItem
                                         key={template.id}
                                         button
-                                        onClick={() => handleUseTemplate(template)}
+                                        onClick={() => handleTemplateClick(template)}
                                         sx={{ borderRadius: 1, mb: 0.5 }}
                                     >
                                         <ListItemText primary={template.text} />
@@ -2071,14 +2164,38 @@ const ClassRecord = () => {
                                         </Typography>
                                     </Grid>
                                 )}
-                                {detailRecord.comment && (
+                                {(detailRecord.typingComment || detailRecord.curriculumComment || detailRecord.comment) && (
                                     <Grid item xs={12}>
-                                        <Typography variant="subtitle2" color="text.secondary">
-                                            コメント
-                                        </Typography>
-                                        <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
-                                            {detailRecord.comment}
-                                        </Typography>
+                                        {detailRecord.typingComment && (
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    タイピングについてのコメント
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                                                    {detailRecord.typingComment}
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                        {detailRecord.curriculumComment && (
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    カリキュラムについてのコメント
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                                                    {detailRecord.curriculumComment}
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                        {!detailRecord.typingComment && !detailRecord.curriculumComment && detailRecord.comment && (
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="subtitle2" color="text.secondary">
+                                                    コメント
+                                                </Typography>
+                                                <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                                                    {detailRecord.comment}
+                                                </Typography>
+                                            </Box>
+                                        )}
                                     </Grid>
                                 )}
                                 {detailRecord.nextClassRange && (
