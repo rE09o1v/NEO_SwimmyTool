@@ -187,13 +187,17 @@ const processStatisticsData = (records) => {
                 if (['12級', '11級', '10級'].includes(parsed.grade)) {
                     // 基本級の場合：文字数を数値として取得
                     const charCount = parsed.data?.basicData?.charCount;
-                    const numericValue = charCount ? parseInt(charCount.toString().replace(/[^\d]/g, '')) : null;
+                    const accuracy = parsed.data?.basicData?.accuracy;
+                    const numericCharCount = charCount ? parseInt(charCount.toString().replace(/[^\d]/g, '')) : null;
+                    const numericAccuracy = accuracy ? parseFloat(accuracy.toString().replace(/[^\d.]/g, '')) : null;
+
                     return {
                         date,
                         grade: parsed.grade,
-                        value: numericValue,
+                        charCount: numericCharCount,
+                        accuracy: numericAccuracy,
                         type: 'basic',
-                        accuracy: parsed.data?.basicData?.accuracy || ''
+                        accuracyText: accuracy || ''
                     };
                 } else {
                     // 上級の場合：評価レベルを数値に変換
@@ -204,7 +208,8 @@ const processStatisticsData = (records) => {
                         grade: parsed.grade,
                         value: averageLevel,
                         type: 'advanced',
-                        themes: advancedData.length
+                        themes: advancedData.length,
+                        themeDetails: advancedData // テーマ別詳細データを追加
                     };
                 }
             } catch (e) {
@@ -212,6 +217,56 @@ const processStatisticsData = (records) => {
             }
         })
         .filter(Boolean);
+
+    // 基本級の級別データを準備
+    const basicGradeData = {};
+    typingProgressData
+        .filter(data => data.type === 'basic')
+        .forEach(data => {
+            if (!basicGradeData[data.grade]) {
+                basicGradeData[data.grade] = [];
+            }
+            basicGradeData[data.grade].push(data);
+        });
+
+    // テーマ別推移データの準備
+    const themeProgressData = {};
+    sortedRecords
+        .filter(record => record.typingResult)
+        .forEach(record => {
+            try {
+                const parsed = JSON.parse(record.typingResult);
+                const date = format(parseISO(record.date), 'MM/dd', { locale: safeJaLocale });
+
+                if (!['12級', '11級', '10級'].includes(parsed.grade)) {
+                    const advancedData = parsed.data?.advancedData || [];
+                    const grade = parsed.grade;
+
+                    if (!themeProgressData[grade]) {
+                        themeProgressData[grade] = {};
+                    }
+
+                    advancedData.forEach((themeData, index) => {
+                        if (themeData.theme && themeData.level) {
+                            const themeName = themeData.theme;
+                            const levelValue = getLevelValue(themeData.level);
+
+                            if (!themeProgressData[grade][themeName]) {
+                                themeProgressData[grade][themeName] = [];
+                            }
+
+                            themeProgressData[grade][themeName].push({
+                                date,
+                                level: themeData.level,
+                                value: levelValue
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                // エラーは無視
+            }
+        });
 
     // 書き取り結果の統計
     const writingStats = records.reduce((acc, record) => {
@@ -235,6 +290,8 @@ const processStatisticsData = (records) => {
         monthRecords: monthRecords.length,
         threeMonthRecords: threeMonthRecords.length,
         typingProgressData,
+        basicGradeData,
+        themeProgressData,
         writingStats,
         uniqueGrades: [...new Set(typingProgressData.map(d => d.grade))].filter(Boolean),
         latestRecords: sortedRecords.slice(-5).reverse()
@@ -242,16 +299,20 @@ const processStatisticsData = (records) => {
 };
 
 // タイピングレベルを数値に変換
-const calculateAverageLevel = (advancedData) => {
-    const levelValues = {
-        'E-': 1, 'E': 2, 'E+': 3,
-        'D-': 4, 'D': 5, 'D+': 6,
-        'C-': 7, 'C': 8, 'C+': 9,
-        'B-': 10, 'B': 11, 'B+': 12,
-        'A-': 13, 'A': 14, 'A+': 15,
-        'S': 16, 'Good': 17, 'Fast': 18
-    };
+const levelValues = {
+    'E-': 1, 'E': 2, 'E+': 3,
+    'D-': 4, 'D': 5, 'D+': 6,
+    'C-': 7, 'C': 8, 'C+': 9,
+    'B-': 10, 'B': 11, 'B+': 12,
+    'A-': 13, 'A': 14, 'A+': 15,
+    'S': 16, 'Good': 17, 'Fast': 18
+};
 
+const getLevelValue = (level) => {
+    return levelValues[level] || 0;
+};
+
+const calculateAverageLevel = (advancedData) => {
     const validLevels = advancedData
         .map(item => levelValues[item.level])
         .filter(value => value !== undefined);
@@ -485,6 +546,7 @@ const ClassRecord = () => {
         instructor: ''
     });
     const [previousTypingResult, setPreviousTypingResult] = useState(null);
+    const [selectedThemeGrade, setSelectedThemeGrade] = useState('');
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
@@ -495,6 +557,25 @@ const ClassRecord = () => {
         }
         loadData();
     }, [studentId]);
+
+    // テーマ別推移の初期値設定
+    useEffect(() => {
+        if (classRecords.length > 0) {
+            const stats = processStatisticsData(classRecords);
+            const availableGrades = Object.keys(stats.themeProgressData);
+
+            if (availableGrades.length > 0 && (!selectedThemeGrade || !availableGrades.includes(selectedThemeGrade))) {
+                const sortedGrades = availableGrades.sort((a, b) => {
+                    const gradeA = parseInt(a.replace('級', ''));
+                    const gradeB = parseInt(b.replace('級', ''));
+                    return gradeB - gradeA;
+                });
+                if (sortedGrades.length > 0) {
+                    setSelectedThemeGrade(sortedGrades[0]);
+                }
+            }
+        }
+    }, [classRecords, selectedThemeGrade]);
 
     const loadData = async () => {
         try {
@@ -935,7 +1016,7 @@ const ClassRecord = () => {
 
                 // タイピング推移グラフのデータ準備
                 const createTypingChartData = () => {
-                    const basicData = stats.typingProgressData.filter(d => d.type === 'basic' && d.value !== null);
+                    const basicData = stats.typingProgressData.filter(d => d.type === 'basic' && d.charCount !== null);
                     const advancedData = stats.typingProgressData.filter(d => d.type === 'advanced' && d.value > 0);
 
                     return {
@@ -943,7 +1024,7 @@ const ClassRecord = () => {
                             labels: basicData.map(d => d.date),
                             datasets: [{
                                 label: '入力文字数',
-                                data: basicData.map(d => d.value),
+                                data: basicData.map(d => d.charCount),
                                 borderColor: 'rgb(75, 192, 192)',
                                 backgroundColor: 'rgba(75, 192, 192, 0.2)',
                                 tension: 0.1,
@@ -1072,7 +1153,7 @@ const ClassRecord = () => {
                                     <CardContent>
                                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                             <BarChart />
-                                            タイピング推移（基本級）
+                                            タイピング推移（基本級全体）
                                         </Typography>
                                         <Box sx={{ height: 300 }}>
                                             <Line data={typingChartData.basic} options={chartOptions} />
@@ -1082,6 +1163,111 @@ const ClassRecord = () => {
                             </Grid>
                         )}
 
+                        {/* 基本級の級別推移グラフ */}
+                        {Object.keys(stats.basicGradeData).map(grade => {
+                            const gradeData = stats.basicGradeData[grade];
+
+                            if (gradeData.length === 0) return null;
+
+                            // 日付でソート
+                            const sortedData = [...gradeData].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                            const charCountData = {
+                                labels: sortedData.map(d => d.date),
+                                datasets: [
+                                    {
+                                        label: '入力文字数',
+                                        data: sortedData.map(d => d.charCount),
+                                        borderColor: 'rgb(54, 162, 235)',
+                                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                        tension: 0.1,
+                                        fill: true,
+                                        yAxisID: 'y'
+                                    },
+                                    {
+                                        label: '正タイプ率(%)',
+                                        data: sortedData.map(d => d.accuracy),
+                                        borderColor: 'rgb(255, 99, 132)',
+                                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                        tension: 0.1,
+                                        fill: false,
+                                        yAxisID: 'y1'
+                                    }
+                                ].filter(dataset => dataset.data.some(d => d !== null))
+                            };
+
+                            return (
+                                <Grid item xs={12} md={6} key={`basic-${grade}`}>
+                                    <Card>
+                                        <CardContent>
+                                            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Timeline />
+                                                {grade}の推移
+                                            </Typography>
+                                            <Box sx={{ height: 300 }}>
+                                                <Line data={charCountData} options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    interaction: {
+                                                        mode: 'index',
+                                                        intersect: false,
+                                                    },
+                                                    plugins: {
+                                                        legend: {
+                                                            position: 'top',
+                                                        },
+                                                        tooltip: {
+                                                            callbacks: {
+                                                                label: function (context) {
+                                                                    if (context.dataset.label === '正タイプ率(%)') {
+                                                                        return `${context.dataset.label}: ${context.parsed.y}%`;
+                                                                    }
+                                                                    return `${context.dataset.label}: ${context.parsed.y}文字`;
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    scales: {
+                                                        x: {
+                                                            display: true,
+                                                            title: {
+                                                                display: true,
+                                                                text: '日付'
+                                                            }
+                                                        },
+                                                        y: {
+                                                            type: 'linear',
+                                                            display: true,
+                                                            position: 'left',
+                                                            title: {
+                                                                display: true,
+                                                                text: '入力文字数'
+                                                            },
+                                                            beginAtZero: true
+                                                        },
+                                                        y1: {
+                                                            type: 'linear',
+                                                            display: true,
+                                                            position: 'right',
+                                                            title: {
+                                                                display: true,
+                                                                text: '正タイプ率(%)'
+                                                            },
+                                                            min: 0,
+                                                            max: 100,
+                                                            grid: {
+                                                                drawOnChartArea: false,
+                                                            },
+                                                        }
+                                                    }
+                                                }} />
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            );
+                        })}
+
                         {/* 上級タイピング推移 */}
                         {typingChartData.advanced.labels.length > 0 && (
                             <Grid item xs={12} md={6}>
@@ -1089,7 +1275,7 @@ const ClassRecord = () => {
                                     <CardContent>
                                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                             <Timeline />
-                                            タイピング推移（上級）
+                                            タイピング推移（上級平均）
                                         </Typography>
                                         <Box sx={{ height: 300 }}>
                                             <Line data={typingChartData.advanced} options={{
@@ -1108,6 +1294,144 @@ const ClassRecord = () => {
                                                 }
                                             }} />
                                         </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        )}
+
+                        {/* テーマ別推移グラフ */}
+                        {Object.keys(stats.themeProgressData).length > 0 && (
+                            <Grid item xs={12}>
+                                <Card>
+                                    <CardContent>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                                            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Timeline />
+                                                テーマ別推移
+                                            </Typography>
+                                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                                                <InputLabel>級を選択</InputLabel>
+                                                <Select
+                                                    value={selectedThemeGrade}
+                                                    label="級を選択"
+                                                    onChange={(e) => setSelectedThemeGrade(e.target.value)}
+                                                >
+                                                    <MenuItem value="">級を選択</MenuItem>
+                                                    {Object.keys(stats.themeProgressData)
+                                                        .sort((a, b) => {
+                                                            // 級を数値でソート（9級, 8級, 7級...の順）
+                                                            const gradeA = parseInt(a.replace('級', ''));
+                                                            const gradeB = parseInt(b.replace('級', ''));
+                                                            return gradeB - gradeA;
+                                                        })
+                                                        .map(grade => (
+                                                            <MenuItem key={grade} value={grade}>
+                                                                {grade}
+                                                            </MenuItem>
+                                                        ))
+                                                    }
+                                                </Select>
+                                            </FormControl>
+                                        </Box>
+
+                                        {selectedThemeGrade && (() => {
+                                            const gradeThemes = stats.themeProgressData[selectedThemeGrade];
+
+                                            if (!gradeThemes || Object.keys(gradeThemes).length === 0) {
+                                                return (
+                                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                                                        {selectedThemeGrade}のデータがありません
+                                                    </Typography>
+                                                );
+                                            }
+
+                                            // テーマごとのデータセットを作成
+                                            const allDates = new Set();
+                                            Object.values(gradeThemes).forEach(themeData => {
+                                                themeData.forEach(entry => allDates.add(entry.date));
+                                            });
+                                            const sortedDates = Array.from(allDates).sort();
+
+                                            const colors = [
+                                                'rgb(255, 99, 132)',   // 赤
+                                                'rgb(54, 162, 235)',   // 青
+                                                'rgb(255, 205, 86)',   // 黄
+                                                'rgb(75, 192, 192)',   // 緑
+                                                'rgb(153, 102, 255)',  // 紫
+                                                'rgb(255, 159, 64)',   // オレンジ
+                                                'rgb(199, 199, 199)',  // グレー
+                                                'rgb(83, 102, 255)'    // インディゴ
+                                            ];
+
+                                            const datasets = Object.keys(gradeThemes).map((themeName, index) => {
+                                                const themeData = gradeThemes[themeName];
+                                                const color = colors[index % colors.length];
+
+                                                // 日付順にデータを整理
+                                                const dataPoints = sortedDates.map(date => {
+                                                    const entry = themeData.find(d => d.date === date);
+                                                    return entry ? entry.value : null;
+                                                });
+
+                                                return {
+                                                    label: themeName,
+                                                    data: dataPoints,
+                                                    borderColor: color,
+                                                    backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+                                                    tension: 0.1,
+                                                    connectNulls: false
+                                                };
+                                            });
+
+                                            const themeChartData = {
+                                                labels: sortedDates,
+                                                datasets
+                                            };
+
+                                            return (
+                                                <Box sx={{ height: 400 }}>
+                                                    <Line data={themeChartData} options={{
+                                                        ...chartOptions,
+                                                        interaction: {
+                                                            mode: 'index',
+                                                            intersect: false,
+                                                        },
+                                                        plugins: {
+                                                            legend: {
+                                                                position: 'top',
+                                                            },
+                                                            tooltip: {
+                                                                callbacks: {
+                                                                    label: function (context) {
+                                                                        const levels = ['', 'E-', 'E', 'E+', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+', 'S', 'Good', 'Fast'];
+                                                                        const levelName = levels[context.parsed.y] || context.parsed.y;
+                                                                        return `${context.dataset.label}: ${levelName}`;
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        scales: {
+                                                            y: {
+                                                                beginAtZero: true,
+                                                                max: 18,
+                                                                ticks: {
+                                                                    callback: function (value) {
+                                                                        const levels = ['', 'E-', 'E', 'E+', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+', 'S', 'Good', 'Fast'];
+                                                                        return levels[value] || value;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }} />
+                                                </Box>
+                                            );
+                                        })()}
+
+                                        {!selectedThemeGrade && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                                                上記のドロップダウンから級を選択してください
+                                            </Typography>
+                                        )}
                                     </CardContent>
                                 </Card>
                             </Grid>
