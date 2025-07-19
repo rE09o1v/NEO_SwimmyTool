@@ -51,7 +51,8 @@ import {
     updateClassRecord,
     deleteClassRecord,
     getCommentTemplates,
-    getMentors
+    getMentors,
+    getLastTypingResult
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
 import { uploadEvaluationSheet, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
@@ -112,9 +113,12 @@ const formatTypingResult = (typingResult) => {
 };
 
 // タイピング結果入力コンポーネント
-const TypingResultInput = ({ typingGrade, typingData, onChange }) => {
+const TypingResultInput = ({ typingGrade, typingData, previousResult, onChange }) => {
     const isBasicGrade = ['12級', '11級', '10級'].includes(typingGrade);
     const availableThemes = TYPING_THEMES[typingGrade] || [];
+
+    // 前回の結果が同じ級かどうかチェック
+    const hasPreviousResult = previousResult && previousResult.grade === typingGrade;
 
     const handleBasicDataChange = (field, value) => {
         onChange({
@@ -181,67 +185,112 @@ const TypingResultInput = ({ typingGrade, typingData, onChange }) => {
 
     if (isBasicGrade) {
         return (
-            <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                    <TextField
-                        fullWidth
-                        label="入力文字数"
-                        value={typingData.basicData?.charCount || ''}
-                        onChange={(e) => handleBasicDataChange('charCount', e.target.value)}
-                        placeholder="例: 120文字"
-                        margin="normal"
-                    />
+            <Box>
+                {hasPreviousResult && (
+                    <Box sx={{ mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: '1px solid #e9ecef' }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                            前回の結果（{previousResult.grade}）
+                        </Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                                <Typography variant="body2">
+                                    入力文字数: {previousResult.data?.basicData?.charCount || '記録なし'}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Typography variant="body2">
+                                    正タイプ率: {previousResult.data?.basicData?.accuracy || '記録なし'}
+                                </Typography>
+                            </Grid>
+                        </Grid>
+                    </Box>
+                )}
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    今回の結果
+                </Typography>
+                <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            fullWidth
+                            label="入力文字数"
+                            value={typingData.basicData?.charCount || ''}
+                            onChange={(e) => handleBasicDataChange('charCount', e.target.value)}
+                            placeholder="例: 120文字"
+                            margin="normal"
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <TextField
+                            fullWidth
+                            label="正タイプ率"
+                            value={typingData.basicData?.accuracy || ''}
+                            onChange={(e) => handleBasicDataChange('accuracy', e.target.value)}
+                            placeholder="例: 95%"
+                            margin="normal"
+                        />
+                    </Grid>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                    <TextField
-                        fullWidth
-                        label="正タイプ率"
-                        value={typingData.basicData?.accuracy || ''}
-                        onChange={(e) => handleBasicDataChange('accuracy', e.target.value)}
-                        placeholder="例: 95%"
-                        margin="normal"
-                    />
-                </Grid>
-            </Grid>
+            </Box>
         );
     }
 
     return (
-        <Grid container spacing={2}>
-            {availableThemes.map((theme, index) => (
-                <Grid item xs={12} key={index}>
-                    <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} md={6}>
-                            <Typography variant="body1" sx={{
-                                padding: '12px',
-                                backgroundColor: '#f5f5f5',
-                                borderRadius: '4px',
-                                border: '1px solid #e0e0e0'
-                            }}>
-                                {theme}
-                            </Typography>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <FormControl fullWidth size="small">
-                                <InputLabel>評価レベル</InputLabel>
-                                <Select
-                                    value={typingData.advancedData?.[index]?.level || ''}
-                                    label="評価レベル"
-                                    onChange={(e) => handleAdvancedDataChange(index, 'level', e.target.value)}
-                                >
-                                    <MenuItem value="">選択してください</MenuItem>
-                                    {TYPING_LEVELS.map((level) => (
-                                        <MenuItem key={level} value={level}>
-                                            {level}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+        <Box>
+            {hasPreviousResult && (
+                <Box sx={{ mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1, border: '1px solid #e9ecef' }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                        前回の結果（{previousResult.grade}）
+                    </Typography>
+                    <Grid container spacing={2}>
+                        {availableThemes.map((theme, index) => (
+                            <Grid item xs={12} md={6} key={`prev-${index}`}>
+                                <Typography variant="body2">
+                                    {theme}: {previousResult.data?.advancedData?.[index]?.level || '記録なし'}
+                                </Typography>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Box>
+            )}
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                今回の結果
+            </Typography>
+            <Grid container spacing={2}>
+                {availableThemes.map((theme, index) => (
+                    <Grid item xs={12} key={index}>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={6}>
+                                <Typography variant="body1" sx={{
+                                    padding: '12px',
+                                    backgroundColor: '#f5f5f5',
+                                    borderRadius: '4px',
+                                    border: '1px solid #e0e0e0'
+                                }}>
+                                    {theme}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>評価レベル</InputLabel>
+                                    <Select
+                                        value={typingData.advancedData?.[index]?.level || ''}
+                                        label="評価レベル"
+                                        onChange={(e) => handleAdvancedDataChange(index, 'level', e.target.value)}
+                                    >
+                                        <MenuItem value="">選択してください</MenuItem>
+                                        {TYPING_LEVELS.map((level) => (
+                                            <MenuItem key={level} value={level}>
+                                                {level}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
                         </Grid>
                     </Grid>
-                </Grid>
-            ))}
-        </Grid>
+                ))}
+            </Grid>
+        </Box>
     );
 };
 
@@ -285,6 +334,7 @@ const ClassRecord = () => {
         nextClassRange: '',
         instructor: ''
     });
+    const [previousTypingResult, setPreviousTypingResult] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
@@ -340,9 +390,11 @@ const ClassRecord = () => {
         setSnackbar({ ...snackbar, open: false });
     };
 
-    const handleOpenDialog = (record = null) => {
+    const handleOpenDialog = async (record = null) => {
         if (record) {
             setEditingRecord(record);
+            setPreviousTypingResult(null); // 編集時は前回の結果を表示しない
+
             // 既存の記録がある場合、typingResultから級とデータを復元
             let typingGrade = '';
             let typingData = {
@@ -383,16 +435,33 @@ const ClassRecord = () => {
             // 今日の日付をローカル時間で取得
             const todayFormatted = formatDateLocal();
 
+            // 新規作成時、生徒が選択されている場合は前回のタイピング結果を取得
+            let defaultTypingGrade = '';
+            let defaultTypingData = {
+                basicData: { charCount: '', accuracy: '' },
+                advancedData: []
+            };
+
+            if (selectedStudent) {
+                try {
+                    const lastTypingResult = await getLastTypingResult(selectedStudent.id);
+                    setPreviousTypingResult(lastTypingResult);
+                    defaultTypingGrade = lastTypingResult.grade || '';
+                } catch (error) {
+                    console.error('前回タイピング結果の取得に失敗しました:', error);
+                    setPreviousTypingResult(null);
+                }
+            } else {
+                setPreviousTypingResult(null);
+            }
+
             setRecordForm({
                 studentId: selectedStudent?.id || '',
                 studentName: selectedStudent?.name || '',
                 date: todayFormatted,
                 classRange: '',
-                typingGrade: '',
-                typingData: {
-                    basicData: { charCount: '', accuracy: '' },
-                    advancedData: []
-                },
+                typingGrade: defaultTypingGrade,
+                typingData: defaultTypingData,
                 writingResult: '',
                 comment: '',
                 nextClassRange: '',
@@ -407,18 +476,42 @@ const ClassRecord = () => {
         setEditingRecord(null);
     };
 
-    const handleFormChange = (field, value) => {
+    const handleFormChange = async (field, value) => {
         setRecordForm({ ...recordForm, [field]: value });
 
         // 生徒選択時
         if (field === 'studentName') {
             const student = students.find(s => s.name === value);
             if (student) {
-                setRecordForm(prev => ({
-                    ...prev,
-                    studentId: student.id,
-                    studentName: student.name
-                }));
+                try {
+                    // 前回のタイピング結果を取得
+                    const lastTypingResult = await getLastTypingResult(student.id);
+                    setPreviousTypingResult(lastTypingResult);
+
+                    setRecordForm(prev => ({
+                        ...prev,
+                        studentId: student.id,
+                        studentName: student.name,
+                        typingGrade: lastTypingResult.grade || '',
+                        typingData: {
+                            basicData: { charCount: '', accuracy: '' },
+                            advancedData: []
+                        }
+                    }));
+                } catch (error) {
+                    console.error('前回タイピング結果の取得に失敗しました:', error);
+                    setPreviousTypingResult(null);
+                    setRecordForm(prev => ({
+                        ...prev,
+                        studentId: student.id,
+                        studentName: student.name,
+                        typingGrade: '',
+                        typingData: {
+                            basicData: { charCount: '', accuracy: '' },
+                            advancedData: []
+                        }
+                    }));
+                }
             }
         }
     };
@@ -785,11 +878,30 @@ const ClassRecord = () => {
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12}>
-                                <TypingResultInput
-                                    typingGrade={recordForm.typingGrade}
-                                    typingData={recordForm.typingData}
-                                    onChange={(newData) => handleFormChange('typingData', newData)}
-                                />
+                                <Box>
+                                    {previousTypingResult && previousTypingResult.grade === recordForm.typingGrade && (
+                                        <Box sx={{ mb: 1, textAlign: 'right' }}>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={() => {
+                                                    setRecordForm(prev => ({
+                                                        ...prev,
+                                                        typingData: previousTypingResult.data
+                                                    }));
+                                                }}
+                                            >
+                                                前回の結果を自動設定
+                                            </Button>
+                                        </Box>
+                                    )}
+                                    <TypingResultInput
+                                        typingGrade={recordForm.typingGrade}
+                                        typingData={recordForm.typingData}
+                                        previousResult={previousTypingResult}
+                                        onChange={(newData) => handleFormChange('typingData', newData)}
+                                    />
+                                </Box>
                             </Grid>
                             <Grid item xs={12} md={6}>
                                 <TextField

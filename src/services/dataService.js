@@ -403,7 +403,7 @@ export const addMentor = async (mentorData) => {
         setTimeout(async () => {
             try {
                 const mentors = await getMentors();
-                
+
                 // 重複チェック
                 const existingMentor = mentors.find(m => m.email === mentorData.email);
                 if (existingMentor) {
@@ -435,7 +435,7 @@ export const updateMentor = async (id, mentorData) => {
             try {
                 const mentors = await getMentors();
                 const index = mentors.findIndex(mentor => mentor.id === id);
-                
+
                 if (index === -1) {
                     reject(new Error('メンターが見つかりません'));
                     return;
@@ -471,7 +471,7 @@ export const deleteMentor = async (id) => {
             try {
                 const mentors = await getMentors();
                 const index = mentors.findIndex(mentor => mentor.id === id);
-                
+
                 if (index === -1) {
                     reject(new Error('メンターが見つかりません'));
                     return;
@@ -489,9 +489,66 @@ export const deleteMentor = async (id) => {
 
 export const searchMentors = async (query) => {
     const mentors = await getMentors();
-    return mentors.filter(mentor => 
+    return mentors.filter(mentor =>
         mentor.name.toLowerCase().includes(query.toLowerCase()) ||
         mentor.email.toLowerCase().includes(query.toLowerCase()) ||
         mentor.speciality.toLowerCase().includes(query.toLowerCase())
     );
+};
+
+// 前回のタイピング結果を取得する関数
+export const getLastTypingResult = async (studentId) => {
+    return new Promise((resolve) => {
+        setTimeout(async () => {
+            try {
+                const records = await getClassRecords(studentId);
+
+                // 最新の記録から前回のタイピング結果を取得
+                if (records.length > 0) {
+                    const lastRecord = records[0]; // 最新の記録
+
+                    if (lastRecord.typingResult) {
+                        try {
+                            // JSON形式のタイピング結果をパース
+                            const parsed = JSON.parse(lastRecord.typingResult);
+                            resolve({
+                                grade: parsed.grade || '',
+                                data: parsed.data || {
+                                    basicData: { charCount: '', accuracy: '' },
+                                    advancedData: []
+                                }
+                            });
+                        } catch (e) {
+                            // 古い形式の場合はデフォルト値を返す
+                            resolve({
+                                grade: '',
+                                data: {
+                                    basicData: { charCount: '', accuracy: '' },
+                                    advancedData: []
+                                }
+                            });
+                        }
+                    }
+                }
+
+                // 記録がない場合はデフォルト値を返す
+                resolve({
+                    grade: '',
+                    data: {
+                        basicData: { charCount: '', accuracy: '' },
+                        advancedData: []
+                    }
+                });
+            } catch (error) {
+                console.error('前回タイピング結果の取得に失敗しました:', error);
+                resolve({
+                    grade: '',
+                    data: {
+                        basicData: { charCount: '', accuracy: '' },
+                        advancedData: []
+                    }
+                });
+            }
+        }, 100);
+    });
 }; 

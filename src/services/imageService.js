@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas';
 import { format, parseISO } from 'date-fns';
 import { safeJaLocale } from './localeSetup';
+import { getLastTypingResult } from './dataService';
 
 // タイピング結果を表示用文字列に変換する関数
 const formatTypingResultForImage = (typingResult) => {
@@ -38,12 +39,50 @@ const formatTypingResultForImage = (typingResult) => {
   }
 };
 
+// 前回のタイピング結果を表示用文字列に変換する関数
+const formatPreviousTypingResult = (previousResult) => {
+  if (!previousResult || !previousResult.data) return '記録なし';
+
+  const grade = previousResult.grade;
+  const data = previousResult.data;
+
+  if (!grade) return '記録なし';
+
+  const isBasicGrade = ['12級', '11級', '10級'].includes(grade);
+
+  if (isBasicGrade) {
+    const charCount = data.basicData?.charCount || '';
+    const accuracy = data.basicData?.accuracy || '';
+    let result = `${grade}`;
+    if (charCount) result += ` 入力文字数: ${charCount}文字`;
+    if (accuracy) result += ` 正タイプ率: ${accuracy}`;
+    return result;
+  } else {
+    const themes = data.advancedData || [];
+    let result = `${grade}`;
+    themes.forEach((theme, index) => {
+      if (theme.theme || theme.level) {
+        result += `<br/>テーマ${index + 1}: ${theme.theme || '?'} - ${theme.level || '?'}`;
+      }
+    });
+    return result || `${grade}: 記録なし`;
+  }
+};
+
 // 評価シート画像生成
 export const generateEvaluationSheet = async (classRecord) => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
+      // 前回のタイピング結果を取得
+      let previousResult = null;
+      try {
+        previousResult = await getLastTypingResult(classRecord.studentId);
+      } catch (error) {
+        console.warn('前回の結果取得に失敗しました:', error);
+      }
+
       // 評価シートのHTMLを動的に作成
-      const sheetHtml = createEvaluationSheetHtml(classRecord);
+      const sheetHtml = createEvaluationSheetHtml(classRecord, previousResult);
 
       // 一時的にDOMに追加
       const tempContainer = document.createElement('div');
@@ -89,8 +128,19 @@ export const generateEvaluationSheet = async (classRecord) => {
 };
 
 // 評価シートのHTMLテンプレート
-const createEvaluationSheetHtml = (record) => {
+const createEvaluationSheetHtml = (record, previousResult = null) => {
   const formattedDate = format(parseISO(record.date), 'yyyy年MM月dd日', { locale: safeJaLocale });
+
+  // 前回の結果と今回の結果が同じ級かどうかチェック
+  let currentTypingData = null;
+  try {
+    currentTypingData = record.typingResult ? JSON.parse(record.typingResult) : null;
+  } catch (e) {
+    console.warn('現在のタイピング結果のパースに失敗しました:', e);
+  }
+
+  const canComparePrevious = previousResult && currentTypingData &&
+    previousResult.grade === currentTypingData.grade;
 
   return `
     <div style="
@@ -151,18 +201,40 @@ const createEvaluationSheetHtml = (record) => {
       <!-- 学習成果 -->
       <div style="margin-bottom: 30px;">
         <h3 style="background-color: #e3f2fd; padding: 12px; margin: 0 0 18px 0; border-left: 6px solid #1976d2; font-size: 22px; color: #333;">学習成果</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-          <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
-            <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">タイピング結果</div>
+        
+        <!-- タイピング結果 -->
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px; margin-bottom: 20px;">
+          <div style="font-weight: bold; color: #333; margin-bottom: 15px; font-size: 18px;">タイピング結果</div>
+          
+          ${canComparePrevious ? `
+            <!-- 前回と今回の比較 -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #f8f9fa;">
+                <div style="font-weight: bold; color: #666; margin-bottom: 8px; font-size: 16px;">前回の結果</div>
+                <div style="font-size: 14px; color: #000; line-height: 1.6;">
+                  ${formatPreviousTypingResult(previousResult)}
+                </div>
+              </div>
+              <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #fff;">
+                <div style="font-weight: bold; color: #333; margin-bottom: 8px; font-size: 16px;">今回の結果</div>
+                <div style="font-size: 14px; color: #000; line-height: 1.6;">
+                  ${formatTypingResultForImage(record.typingResult)}
+                </div>
+              </div>
+            </div>
+          ` : `
+            <!-- 今回の結果のみ -->
             <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
               ${formatTypingResultForImage(record.typingResult)}
             </div>
-          </div>
-          <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
-            <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">書き取り練習結果</div>
-            <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
-              ${record.writingResult || '記録なし'}
-            </div>
+          `}
+        </div>
+        
+        <!-- 書き取り練習結果 -->
+        <div style="border: 2px solid #ccc; padding: 18px; border-radius: 8px;">
+          <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 18px;">書き取り練習結果</div>
+          <div style="font-size: 16px; color: #000; min-height: 60px; line-height: 1.6;">
+            ${record.writingResult || '記録なし'}
           </div>
         </div>
       </div>

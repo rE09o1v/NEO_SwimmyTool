@@ -66,13 +66,13 @@ function App() {
                     <Route path="/students" element={<StudentManagement />} />
                     <Route path="/class-record" element={<ClassRecord />} />
                     <Route path="/class-record/:studentId" element={<ClassRecord />} />
-                    <Route 
-                        path="/mentors" 
+                    <Route
+                        path="/mentors"
                         element={
-                            user && user.role === 'admin' 
-                                ? <MentorManagement /> 
+                            user && user.role === 'admin'
+                                ? <MentorManagement />
                                 : <Navigate to="/" replace />
-                        } 
+                        }
                     />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
