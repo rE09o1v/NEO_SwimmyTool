@@ -497,15 +497,20 @@ export const searchMentors = async (query) => {
 };
 
 // 前回のタイピング結果を取得する関数
-export const getLastTypingResult = async (studentId) => {
+export const getLastTypingResult = async (studentId, excludeRecordId = null) => {
     return new Promise((resolve) => {
         setTimeout(async () => {
             try {
                 const records = await getClassRecords(studentId);
 
+                // 指定されたレコードIDを除外
+                const filteredRecords = excludeRecordId
+                    ? records.filter(record => record.id !== excludeRecordId)
+                    : records;
+
                 // 最新の記録から前回のタイピング結果を取得
-                if (records.length > 0) {
-                    const lastRecord = records[0]; // 最新の記録
+                if (filteredRecords.length > 0) {
+                    const lastRecord = filteredRecords[0]; // 最新の記録
 
                     if (lastRecord.typingResult) {
                         try {

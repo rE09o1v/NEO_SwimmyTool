@@ -479,7 +479,7 @@ const ClassRecord = () => {
 
             if (selectedStudent) {
                 try {
-                    const lastTypingResult = await getLastTypingResult(selectedStudent.id);
+                    const lastTypingResult = await getLastTypingResult(selectedStudent.id, editingRecord?.id);
                     setPreviousTypingResult(lastTypingResult);
                     defaultTypingGrade = lastTypingResult.grade || '';
                 } catch (error) {
@@ -520,8 +520,8 @@ const ClassRecord = () => {
             const student = students.find(s => s.name === value);
             if (student) {
                 try {
-                    // 前回のタイピング結果を取得
-                    const lastTypingResult = await getLastTypingResult(student.id);
+                    // 前回のタイピング結果を取得（編集中の場合は現在のレコードを除外）
+                    const lastTypingResult = await getLastTypingResult(student.id, editingRecord?.id);
                     setPreviousTypingResult(lastTypingResult);
 
                     setRecordForm(prev => ({

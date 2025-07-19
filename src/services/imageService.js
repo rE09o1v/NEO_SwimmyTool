@@ -90,10 +90,10 @@ const formatWritingResultForImage = (record) => {
 export const generateEvaluationSheet = async (classRecord) => {
   return new Promise(async (resolve, reject) => {
     try {
-      // 前回のタイピング結果を取得
+      // 前回のタイピング結果を取得（現在の記録を除外）
       let previousResult = null;
       try {
-        previousResult = await getLastTypingResult(classRecord.studentId);
+        previousResult = await getLastTypingResult(classRecord.studentId, classRecord.id);
       } catch (error) {
         console.warn('前回の結果取得に失敗しました:', error);
       }
