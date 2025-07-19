@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import StudentManagement from './components/StudentManagement';
 import ClassRecord from './components/ClassRecord';
 import MentorManagement from './components/MentorManagement';
+import ClassManagement from './components/ClassManagement';
 import Navbar from './components/Navbar';
 import { initializeDemoData } from './services/dataService';
 
@@ -71,6 +72,14 @@ function App() {
                         element={
                             user && user.role === 'admin'
                                 ? <MentorManagement />
+                                : <Navigate to="/" replace />
+                        }
+                    />
+                    <Route
+                        path="/classes"
+                        element={
+                            user && user.role === 'admin'
+                                ? <ClassManagement />
                                 : <Navigate to="/" replace />
                         }
                     />

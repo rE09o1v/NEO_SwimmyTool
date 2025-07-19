@@ -71,7 +71,8 @@ import {
     deleteClassRecord,
     getCommentTemplates,
     getMentors,
-    getLastTypingResult
+    getLastTypingResult,
+    getClasses
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
 import { uploadEvaluationSheet, uploadEvaluationAndResultImages, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
@@ -512,6 +513,7 @@ const ClassRecord = () => {
     const [classRecords, setClassRecords] = useState([]);
     const [commentTemplates, setCommentTemplates] = useState([]);
     const [mentors, setMentors] = useState([]);
+    const [classes, setClasses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
@@ -534,7 +536,8 @@ const ClassRecord = () => {
         studentId: '',
         studentName: '',
         date: formatDateLocal(),
-        classRange: '',
+        classId: '', // クラス選択
+        classRange: '', // 従来の授業範囲（後方互換性のため）
         typingGrade: '',
         typingData: {
             basicData: {
@@ -594,15 +597,17 @@ const ClassRecord = () => {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [studentsData, templatesData, mentorsData] = await Promise.all([
+            const [studentsData, templatesData, mentorsData, classesData] = await Promise.all([
                 getStudents(),
                 getCommentTemplates(),
-                getMentors()
+                getMentors(),
+                getClasses()
             ]);
 
             setStudents(studentsData);
             setCommentTemplates(templatesData);
             setMentors(mentorsData);
+            setClasses(classesData);
 
             if (studentId) {
                 const student = studentsData.find(s => s.id === studentId);
@@ -681,6 +686,7 @@ const ClassRecord = () => {
                 studentId: record.studentId,
                 studentName: record.studentName,
                 date: formattedDate,
+                classId: record.classId || '', // 既存データ互換性のため
                 classRange: record.classRange,
                 typingGrade: typingGrade,
                 typingData: typingData,
@@ -724,6 +730,7 @@ const ClassRecord = () => {
                 studentId: selectedStudent?.id || '',
                 studentName: selectedStudent?.name || '',
                 date: todayFormatted,
+                classId: '',
                 classRange: '',
                 typingGrade: defaultTypingGrade,
                 typingData: defaultTypingData,
@@ -752,6 +759,7 @@ const ClassRecord = () => {
             studentId: selectedStudent?.id || '',
             studentName: selectedStudent?.name || '',
             date: formatDateLocal(),
+            classId: '',
             classRange: '',
             typingGrade: '',
             typingData: {
@@ -862,7 +870,7 @@ const ClassRecord = () => {
     };
 
     const handleSubmit = async () => {
-        if (!recordForm.studentId || !recordForm.classRange || !recordForm.instructor) {
+        if (!recordForm.studentId || !recordForm.classId || !recordForm.instructor) {
             showSnackbar('必須項目を入力してください', 'error');
             return;
         }
@@ -1111,7 +1119,23 @@ const ClassRecord = () => {
                                         </Box>
 
                                         <Typography variant="body2" color="text.secondary" gutterBottom>
-                                            授業範囲: {record.classRange}
+                                            {(() => {
+                                                const classInfo = record.classId 
+                                                    ? classes.find(c => c.id === record.classId)
+                                                    : null;
+                                                const className = classInfo ? classInfo.name : '';
+                                                const range = record.classRange || '';
+                                                
+                                                if (className && range) {
+                                                    return `${className}: ${range}`;
+                                                } else if (className) {
+                                                    return `クラス: ${className}`;
+                                                } else if (range) {
+                                                    return `授業範囲: ${range}`;
+                                                } else {
+                                                    return '授業範囲: 未設定';
+                                                }
+                                            })()}
                                         </Typography>
 
                                         {record.instructor && (
@@ -1841,13 +1865,31 @@ const ClassRecord = () => {
                                     </Select>
                                 </FormControl>
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={12} md={6}>
+                                <FormControl fullWidth margin="normal" required>
+                                    <InputLabel>クラス *</InputLabel>
+                                    <Select
+                                        value={recordForm.classId}
+                                        label="クラス *"
+                                        onChange={(e) => handleFormChange('classId', e.target.value)}
+                                    >
+                                        <MenuItem value="">選択してください</MenuItem>
+                                        {classes.map((classItem) => (
+                                            <MenuItem key={classItem.id} value={classItem.id}>
+                                                {classItem.name} {classItem.description && `(${classItem.description})`}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
                                 <TextField
                                     fullWidth
-                                    label="授業範囲 *"
+                                    label="実施範囲"
                                     value={recordForm.classRange}
                                     onChange={(e) => handleFormChange('classRange', e.target.value)}
                                     margin="normal"
+                                    placeholder="例: Unit 1-3, 基本操作"
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
@@ -2172,7 +2214,23 @@ const ClassRecord = () => {
                                         授業範囲
                                     </Typography>
                                     <Typography variant="body1" sx={{ mb: 2 }}>
-                                        {detailRecord.classRange}
+                                        {(() => {
+                                            const classInfo = detailRecord.classId 
+                                                ? classes.find(c => c.id === detailRecord.classId)
+                                                : null;
+                                            const className = classInfo ? classInfo.name : '';
+                                            const range = detailRecord.classRange || '';
+                                            
+                                            if (className && range) {
+                                                return `${className}: ${range}`;
+                                            } else if (className) {
+                                                return `クラス: ${className}`;
+                                            } else if (range) {
+                                                return range;
+                                            } else {
+                                                return '未設定';
+                                            }
+                                        })()}
                                     </Typography>
                                 </Grid>
                                 {detailRecord.typingResult && (

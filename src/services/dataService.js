@@ -5,7 +5,8 @@ const STORAGE_KEYS = {
     STUDENTS: 'swimmy_students',
     CLASS_RECORDS: 'swimmy_class_records',
     TEMPLATES: 'swimmy_comment_templates',
-    MENTORS: 'swimmy_mentors'
+    MENTORS: 'swimmy_mentors',
+    CLASSES: 'swimmy_classes'
 };
 
 // ユーティリティ関数
@@ -378,6 +379,12 @@ export const initializeDemoData = async () => {
 
             console.log('デモメンターデータを作成しました');
         }
+
+        // デモクラスデータの初期化
+        const classesData = await getClasses();
+        if (classesData.length === 0) {
+            console.log('デモクラスデータを作成しました');
+        }
     } catch (error) {
         console.error('デモデータの初期化に失敗しました:', error);
     }
@@ -544,4 +551,123 @@ export const getLastTypingResult = async (studentId, excludeRecordId = null) => 
             }
         }, 100);
     });
-}; 
+};
+
+// クラス管理機能
+export const getClasses = async () => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            let classes = getFromStorage(STORAGE_KEYS.CLASSES);
+
+            // 初期クラスがない場合は作成
+            if (classes.length === 0) {
+                classes = [
+                    { id: '1', name: 'M1', description: '基礎レベル', order: 1 },
+                    { id: '2', name: 'M2', description: '中級レベル', order: 2 },
+                    { id: '3', name: 'M3', description: '上級レベル', order: 3 }
+                ];
+                saveToStorage(STORAGE_KEYS.CLASSES, classes);
+            }
+
+            // 順序でソート
+            classes.sort((a, b) => (a.order || 0) - (b.order || 0));
+            resolve(classes);
+        }, 100);
+    });
+};
+
+export const getClass = async (id) => {
+    const classes = await getClasses();
+    return classes.find(classItem => classItem.id === id);
+};
+
+export const addClass = async (classData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const classes = await getClasses();
+
+                // 重複チェック
+                const existingClass = classes.find(c => c.name === classData.name);
+                if (existingClass) {
+                    reject(new Error('このクラス名は既に登録されています'));
+                    return;
+                }
+
+                const newClass = {
+                    id: generateId(),
+                    ...classData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                classes.push(newClass);
+                saveToStorage(STORAGE_KEYS.CLASSES, classes);
+                resolve(newClass);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const updateClass = async (id, classData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const classes = await getClasses();
+                const index = classes.findIndex(classItem => classItem.id === id);
+
+                if (index === -1) {
+                    reject(new Error('クラスが見つかりません'));
+                    return;
+                }
+
+                // 重複チェック（自分以外）
+                const existingClass = classes.find(c => c.name === classData.name && c.id !== id);
+                if (existingClass) {
+                    reject(new Error('このクラス名は既に登録されています'));
+                    return;
+                }
+
+                classes[index] = {
+                    ...classes[index],
+                    ...classData,
+                    updatedAt: new Date().toISOString()
+                };
+
+                saveToStorage(STORAGE_KEYS.CLASSES, classes);
+                resolve(classes[index]);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const deleteClass = async (id) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const classes = await getClasses();
+                const filteredClasses = classes.filter(classItem => classItem.id !== id);
+
+                if (saveToStorage(STORAGE_KEYS.CLASSES, filteredClasses)) {
+                    resolve(true);
+                } else {
+                    reject(new Error('削除に失敗しました'));
+                }
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const searchClasses = async (query) => {
+    const classes = await getClasses();
+    return classes.filter(classItem =>
+        classItem.name.toLowerCase().includes(query.toLowerCase()) ||
+        (classItem.description && classItem.description.toLowerCase().includes(query.toLowerCase()))
+    );
+};
