@@ -42,10 +42,27 @@ import {
     CloudUpload,
     Assignment,
     Image as ImageIcon,
-    Article as Template
+    Article as Template,
+    TrendingUp,
+    Analytics,
+    BarChart,
+    Timeline
 } from '@mui/icons-material';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, subDays, subMonths } from 'date-fns';
 import { safeJaLocale } from '../services/localeSetup';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+} from 'chart.js';
+import { Line, Bar } from 'react-chartjs-2';
 import {
     getStudents,
     getClassRecords,
@@ -58,6 +75,19 @@ import {
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
 import { uploadEvaluationSheet, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
+
+// Chart.jsの設定
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 // タイピング評価レベル（9級〜1級用）
 const TYPING_LEVELS = [
@@ -129,6 +159,106 @@ const formatWritingResultForDisplay = (record) => {
     }
 
     return '記録なし';
+};
+
+// 統計データを処理する関数
+const processStatisticsData = (records) => {
+    // 日付順にソート（古い順）
+    const sortedRecords = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // 期間別統計
+    const now = new Date();
+    const lastWeek = subDays(now, 7);
+    const lastMonth = subMonths(now, 1);
+    const last3Months = subMonths(now, 3);
+
+    const weekRecords = records.filter(r => new Date(r.date) >= lastWeek);
+    const monthRecords = records.filter(r => new Date(r.date) >= lastMonth);
+    const threeMonthRecords = records.filter(r => new Date(r.date) >= last3Months);
+
+    // タイピング結果の推移データ準備
+    const typingProgressData = sortedRecords
+        .filter(record => record.typingResult)
+        .map(record => {
+            try {
+                const parsed = JSON.parse(record.typingResult);
+                const date = format(parseISO(record.date), 'MM/dd', { locale: safeJaLocale });
+
+                if (['12級', '11級', '10級'].includes(parsed.grade)) {
+                    // 基本級の場合：文字数を数値として取得
+                    const charCount = parsed.data?.basicData?.charCount;
+                    const numericValue = charCount ? parseInt(charCount.toString().replace(/[^\d]/g, '')) : null;
+                    return {
+                        date,
+                        grade: parsed.grade,
+                        value: numericValue,
+                        type: 'basic',
+                        accuracy: parsed.data?.basicData?.accuracy || ''
+                    };
+                } else {
+                    // 上級の場合：評価レベルを数値に変換
+                    const advancedData = parsed.data?.advancedData || [];
+                    const averageLevel = calculateAverageLevel(advancedData);
+                    return {
+                        date,
+                        grade: parsed.grade,
+                        value: averageLevel,
+                        type: 'advanced',
+                        themes: advancedData.length
+                    };
+                }
+            } catch (e) {
+                return null;
+            }
+        })
+        .filter(Boolean);
+
+    // 書き取り結果の統計
+    const writingStats = records.reduce((acc, record) => {
+        let step = null;
+        if (record.writingStep) {
+            step = record.writingStep;
+        } else if (record.writingResult && record.writingResult.includes('STEP')) {
+            const match = record.writingResult.match(/STEP(\d)/);
+            step = match ? match[1] : null;
+        }
+
+        if (step) {
+            acc[`step${step}`] = (acc[`step${step}`] || 0) + 1;
+        }
+        return acc;
+    }, {});
+
+    return {
+        totalRecords: records.length,
+        weekRecords: weekRecords.length,
+        monthRecords: monthRecords.length,
+        threeMonthRecords: threeMonthRecords.length,
+        typingProgressData,
+        writingStats,
+        uniqueGrades: [...new Set(typingProgressData.map(d => d.grade))].filter(Boolean),
+        latestRecords: sortedRecords.slice(-5).reverse()
+    };
+};
+
+// タイピングレベルを数値に変換
+const calculateAverageLevel = (advancedData) => {
+    const levelValues = {
+        'E-': 1, 'E': 2, 'E+': 3,
+        'D-': 4, 'D': 5, 'D+': 6,
+        'C-': 7, 'C': 8, 'C+': 9,
+        'B-': 10, 'B': 11, 'B+': 12,
+        'A-': 13, 'A': 14, 'A+': 15,
+        'S': 16, 'Good': 17, 'Fast': 18
+    };
+
+    const validLevels = advancedData
+        .map(item => levelValues[item.level])
+        .filter(value => value !== undefined);
+
+    return validLevels.length > 0
+        ? Math.round(validLevels.reduce((sum, val) => sum + val, 0) / validLevels.length)
+        : 0;
 };
 
 // タイピング結果入力コンポーネント
@@ -800,30 +930,264 @@ const ClassRecord = () => {
             )}
 
             {/* 統計情報 */}
-            {tabValue === 1 && (
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                    記録統計
-                                </Typography>
-                                <Typography variant="body2">
-                                    総授業回数: {classRecords.length}回
-                                </Typography>
-                                <Typography variant="body2">
-                                    今月の授業回数: {classRecords.filter(record => {
-                                        const recordDate = parseISO(record.date);
-                                        const now = new Date();
-                                        return recordDate.getMonth() === now.getMonth() &&
-                                            recordDate.getFullYear() === now.getFullYear();
-                                    }).length}回
-                                </Typography>
-                            </CardContent>
-                        </Card>
+            {tabValue === 1 && (() => {
+                const stats = processStatisticsData(classRecords);
+
+                // タイピング推移グラフのデータ準備
+                const createTypingChartData = () => {
+                    const basicData = stats.typingProgressData.filter(d => d.type === 'basic' && d.value !== null);
+                    const advancedData = stats.typingProgressData.filter(d => d.type === 'advanced' && d.value > 0);
+
+                    return {
+                        basic: {
+                            labels: basicData.map(d => d.date),
+                            datasets: [{
+                                label: '入力文字数',
+                                data: basicData.map(d => d.value),
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                tension: 0.1,
+                                fill: true
+                            }]
+                        },
+                        advanced: {
+                            labels: advancedData.map(d => d.date),
+                            datasets: [{
+                                label: '評価レベル（平均）',
+                                data: advancedData.map(d => d.value),
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                tension: 0.1,
+                                fill: true
+                            }]
+                        }
+                    };
+                };
+
+                // 書き取り統計のグラフデータ
+                const writingChartData = {
+                    labels: ['STEP1', 'STEP2', 'STEP3'],
+                    datasets: [{
+                        label: '実施回数',
+                        data: [
+                            stats.writingStats.step1 || 0,
+                            stats.writingStats.step2 || 0,
+                            stats.writingStats.step3 || 0
+                        ],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.5)',
+                            'rgba(255, 206, 86, 0.5)',
+                            'rgba(75, 192, 192, 0.5)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+
+                const chartOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                };
+
+                const typingChartData = createTypingChartData();
+
+                return (
+                    <Grid container spacing={3}>
+                        {/* 概要統計 */}
+                        <Grid item xs={12}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <Card>
+                                        <CardContent sx={{ textAlign: 'center' }}>
+                                            <Assignment sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                                            <Typography variant="h4" color="primary">
+                                                {stats.totalRecords}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                総授業回数
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <Card>
+                                        <CardContent sx={{ textAlign: 'center' }}>
+                                            <Analytics sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                                            <Typography variant="h4" color="success.main">
+                                                {stats.monthRecords}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                今月の授業
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <Card>
+                                        <CardContent sx={{ textAlign: 'center' }}>
+                                            <TrendingUp sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                                            <Typography variant="h4" color="warning.main">
+                                                {stats.weekRecords}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                今週の授業
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={3}>
+                                    <Card>
+                                        <CardContent sx={{ textAlign: 'center' }}>
+                                            <Timeline sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
+                                            <Typography variant="h4" color="info.main">
+                                                {stats.uniqueGrades.length}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                取り組み級数
+                                            </Typography>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+
+                        {/* タイピング推移グラフ */}
+                        {typingChartData.basic.labels.length > 0 && (
+                            <Grid item xs={12} md={6}>
+                                <Card>
+                                    <CardContent>
+                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <BarChart />
+                                            タイピング推移（基本級）
+                                        </Typography>
+                                        <Box sx={{ height: 300 }}>
+                                            <Line data={typingChartData.basic} options={chartOptions} />
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        )}
+
+                        {/* 上級タイピング推移 */}
+                        {typingChartData.advanced.labels.length > 0 && (
+                            <Grid item xs={12} md={6}>
+                                <Card>
+                                    <CardContent>
+                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Timeline />
+                                            タイピング推移（上級）
+                                        </Typography>
+                                        <Box sx={{ height: 300 }}>
+                                            <Line data={typingChartData.advanced} options={{
+                                                ...chartOptions,
+                                                scales: {
+                                                    y: {
+                                                        beginAtZero: true,
+                                                        max: 18,
+                                                        ticks: {
+                                                            callback: function (value) {
+                                                                const levels = ['', 'E-', 'E', 'E+', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+', 'S', 'Good', 'Fast'];
+                                                                return levels[value] || value;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }} />
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        )}
+
+                        {/* 書き取り統計 */}
+                        <Grid item xs={12} md={6}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <BarChart />
+                                        書き取りSTEP別実施回数
+                                    </Typography>
+                                    <Box sx={{ height: 300 }}>
+                                        <Bar data={writingChartData} options={chartOptions} />
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* 最近の記録 */}
+                        <Grid item xs={12} md={6}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom>
+                                        最近の記録
+                                    </Typography>
+                                    <List dense>
+                                        {stats.latestRecords.slice(0, 5).map((record, index) => (
+                                            <ListItem key={index}>
+                                                <ListItemText
+                                                    primary={`${format(parseISO(record.date), 'MM/dd', { locale: safeJaLocale })} - ${record.classRange}`}
+                                                    secondary={formatTypingResult(record.typingResult)}
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+
+                        {/* 詳細統計 */}
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" gutterBottom>
+                                        詳細統計
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12} md={4}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                過去3ヶ月の授業回数
+                                            </Typography>
+                                            <Typography variant="h6">
+                                                {stats.threeMonthRecords}回
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                タイピング記録のある授業
+                                            </Typography>
+                                            <Typography variant="h6">
+                                                {stats.typingProgressData.length}回
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} md={4}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                取り組んだ級
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {stats.uniqueGrades.join(', ') || '記録なし'}
+                                            </Typography>
+                                        </Grid>
+                                    </Grid>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     </Grid>
-                </Grid>
-            )}
+                );
+            })()}
 
             {/* フローティングアクションボタン（モバイル用） */}
             <Fab
