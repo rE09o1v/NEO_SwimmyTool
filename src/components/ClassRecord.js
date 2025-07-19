@@ -74,7 +74,7 @@ import {
     getLastTypingResult
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
-import { uploadEvaluationSheet, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
+import { uploadEvaluationSheet, uploadEvaluationAndResultImages, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
 
 // Chart.jsの設定
 ChartJS.register(
@@ -516,6 +516,8 @@ const ClassRecord = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
     const [editingRecord, setEditingRecord] = useState(null);
+    const [openDetailDialog, setOpenDetailDialog] = useState(false);
+    const [detailRecord, setDetailRecord] = useState(null);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     // 日付をローカル時間でフォーマット
@@ -543,11 +545,13 @@ const ClassRecord = () => {
         writingType: [],
         comment: '',
         nextClassRange: '',
-        instructor: ''
+        instructor: '',
+        images: [] // 成果物画像配列を追加
     });
     const [previousTypingResult, setPreviousTypingResult] = useState(null);
     const [selectedThemeGrade, setSelectedThemeGrade] = useState('');
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const [imageFiles, setImageFiles] = useState([]); // アップロードされた画像ファイルの実体
 
     useEffect(() => {
         // ログインユーザー情報を取得
@@ -674,8 +678,12 @@ const ClassRecord = () => {
                 writingType: writingType,
                 comment: record.comment,
                 nextClassRange: record.nextClassRange,
-                instructor: record.instructor || ''
+                instructor: record.instructor || '',
+                images: record.images || [] // 既存の画像を読み込み
             });
+            
+            // 編集時の画像ファイル状態をリセット（保存された画像のみ表示）
+            setImageFiles([]);
         } else {
             setEditingRecord(null);
             // 今日の日付をローカル時間で取得
@@ -712,8 +720,12 @@ const ClassRecord = () => {
                 writingType: [],
                 comment: '',
                 nextClassRange: '',
-                instructor: currentUser?.name || ''
+                instructor: currentUser?.name || '',
+                images: [] // 新規作成時は空の画像配列
             });
+            
+            // 新規作成時は画像ファイル状態もリセット
+            setImageFiles([]);
         }
         setOpenDialog(true);
     };
@@ -721,6 +733,29 @@ const ClassRecord = () => {
     const handleCloseDialog = () => {
         setOpenDialog(false);
         setEditingRecord(null);
+        // 画像ファイル状態をリセット
+        setImageFiles([]);
+        // フォームをリセット
+        setRecordForm({
+            studentId: selectedStudent?.id || '',
+            studentName: selectedStudent?.name || '',
+            date: formatDateLocal(),
+            classRange: '',
+            typingGrade: '',
+            typingData: {
+                basicData: {
+                    charCount: '',
+                    accuracy: ''
+                },
+                advancedData: []
+            },
+            writingStep: '',
+            writingType: [],
+            comment: '',
+            nextClassRange: '',
+            instructor: '',
+            images: []
+        });
     };
 
     const handleFormChange = async (field, value) => {
@@ -760,6 +795,56 @@ const ClassRecord = () => {
                     }));
                 }
             }
+        }
+    };
+
+    // 簡単なID生成関数
+    const generateId = () => {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    };
+
+    // 画像ファイルアップロード処理
+    const handleImageUpload = (event) => {
+        const files = Array.from(event.target.files);
+        
+        files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const imageData = {
+                        id: generateId(),
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        dataUrl: e.target.result
+                    };
+                    
+                    setRecordForm(prev => ({
+                        ...prev,
+                        images: [...prev.images, imageData]
+                    }));
+                    
+                    setImageFiles(prev => [...prev, file]);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // 入力をクリア
+        event.target.value = '';
+    };
+
+    // 画像削除処理
+    const handleImageRemove = (imageId) => {
+        const imageIndex = recordForm.images.findIndex(img => img.id === imageId);
+        
+        setRecordForm(prev => ({
+            ...prev,
+            images: prev.images.filter(img => img.id !== imageId)
+        }));
+        
+        if (imageIndex !== -1) {
+            setImageFiles(prev => prev.filter((_, index) => index !== imageIndex));
         }
     };
 
@@ -843,11 +928,46 @@ const ClassRecord = () => {
             if (isGoogleAuthenticated()) {
                 try {
                     showSnackbar('Google Driveにアップロードしています...', 'info');
-                    const uploadResult = await uploadEvaluationSheet(imageBlob, record);
-                    showSnackbar(
-                        `評価シート画像を生成し、Google Driveにアップロードしました\nパス: ${uploadResult.uploadPath || '生徒管理フォルダ'}`,
-                        'success'
-                    );
+                    
+                    // 成果物画像がある場合は一括アップロード
+                    if (record.images && record.images.length > 0) {
+                        // 画像データからBlobを再作成
+                        const imageFiles = await Promise.all(
+                            record.images.map(async (image) => {
+                                const response = await fetch(image.dataUrl);
+                                return response.blob();
+                            })
+                        );
+                        
+                        const uploadResult = await uploadEvaluationAndResultImages(
+                            imageBlob, 
+                            imageFiles, 
+                            record.images, 
+                            record
+                        );
+                        
+                        let message = '評価シート画像を生成し、Google Driveにアップロードしました';
+                        
+                        if (uploadResult.resultImages) {
+                            const { successCount, totalFiles } = uploadResult.resultImages;
+                            message += `\n成果物画像: ${successCount}/${totalFiles}枚アップロード完了`;
+                        }
+                        
+                        if (uploadResult.errors.length > 0) {
+                            message += `\n一部エラー: ${uploadResult.errors.join(', ')}`;
+                        }
+                        
+                        message += `\nパス: ${uploadResult.evaluation?.uploadPath || '生徒管理フォルダ'}`;
+                        
+                        showSnackbar(message, uploadResult.errors.length > 0 ? 'warning' : 'success');
+                    } else {
+                        // 成果物画像がない場合は評価シートのみ
+                        const uploadResult = await uploadEvaluationSheet(imageBlob, record);
+                        showSnackbar(
+                            `評価シート画像を生成し、Google Driveにアップロードしました\nパス: ${uploadResult.uploadPath || '生徒管理フォルダ'}`,
+                            'success'
+                        );
+                    }
                 } catch (uploadError) {
                     console.error('Google Drive アップロードエラー:', uploadError);
                     showSnackbar('画像生成は完了しましたが、Google Driveアップロードに失敗しました', 'warning');
@@ -856,6 +976,7 @@ const ClassRecord = () => {
                 showSnackbar('評価シート画像を生成しました（Google Drive未連携）');
             }
         } catch (error) {
+            console.error('画像生成エラー:', error);
             showSnackbar('画像生成に失敗しました', 'error');
         }
     };
@@ -868,6 +989,16 @@ const ClassRecord = () => {
 
         handleFormChange('comment', newComment);
         setOpenTemplateDialog(false);
+    };
+
+    const handleOpenDetail = (record) => {
+        setDetailRecord(record);
+        setOpenDetailDialog(true);
+    };
+
+    const handleCloseDetail = () => {
+        setOpenDetailDialog(false);
+        setDetailRecord(null);
     };
 
     const templatesByCategory = commentTemplates.reduce((acc, template) => {
@@ -914,7 +1045,7 @@ const ClassRecord = () => {
                     {classRecords.length > 0 ? (
                         classRecords.map((record) => (
                             <Grid item xs={12} md={6} lg={4} key={record.id}>
-                                <Card>
+                                <Card sx={{ cursor: 'pointer' }} onClick={() => handleOpenDetail(record)}>
                                     <CardContent>
                                         <Box display="flex" justifyContent="space-between" alignItems="start" mb={2}>
                                             <Typography variant="h6" component="div">
@@ -964,11 +1095,66 @@ const ClassRecord = () => {
                                             </Typography>
                                         )}
 
+                                        {record.images && record.images.length > 0 && (
+                                            <Box sx={{ mt: 2 }}>
+                                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                                    成果物画像 ({record.images.length}枚)
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
+                                                    {record.images.slice(0, 3).map((image) => (
+                                                        <Box
+                                                            key={image.id}
+                                                            sx={{
+                                                                flexShrink: 0,
+                                                                width: 60,
+                                                                height: 60,
+                                                                borderRadius: 1,
+                                                                overflow: 'hidden',
+                                                                border: '1px solid #e0e0e0'
+                                                            }}
+                                                        >
+                                                            <img
+                                                                src={image.dataUrl}
+                                                                alt={image.name}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: 'cover'
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                    ))}
+                                                    {record.images.length > 3 && (
+                                                        <Box
+                                                            sx={{
+                                                                flexShrink: 0,
+                                                                width: 60,
+                                                                height: 60,
+                                                                borderRadius: 1,
+                                                                border: '1px solid #e0e0e0',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                backgroundColor: '#f5f5f5'
+                                                            }}
+                                                        >
+                                                            <Typography variant="caption">
+                                                                +{record.images.length - 3}
+                                                            </Typography>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        )}
+
                                         <Box display="flex" justifyContent="space-between" mt={2}>
                                             <Box>
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => handleOpenDialog(record)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenDialog(record);
+                                                    }}
                                                     title="編集"
                                                 >
                                                     <Edit />
@@ -976,7 +1162,10 @@ const ClassRecord = () => {
                                                 <IconButton
                                                     size="small"
                                                     color="error"
-                                                    onClick={() => handleDelete(record)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(record);
+                                                    }}
                                                     title="削除"
                                                 >
                                                     <Delete />
@@ -985,7 +1174,10 @@ const ClassRecord = () => {
                                             <Button
                                                 size="small"
                                                 startIcon={<ImageIcon />}
-                                                onClick={() => handleGenerateImage(record)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenerateImage(record);
+                                                }}
                                             >
                                                 画像生成
                                             </Button>
@@ -1712,6 +1904,71 @@ const ClassRecord = () => {
                                     margin="normal"
                                 />
                             </Grid>
+                            <Grid item xs={12}>
+                                <Box sx={{ mt: 2 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <ImageIcon />
+                                        成果物画像
+                                    </Typography>
+                                    <input
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                        id="image-upload-button"
+                                        multiple
+                                        type="file"
+                                        onChange={handleImageUpload}
+                                    />
+                                    <label htmlFor="image-upload-button">
+                                        <Button variant="outlined" component="span" startIcon={<CloudUpload />}>
+                                            画像をアップロード
+                                        </Button>
+                                    </label>
+                                    
+                                    {recordForm.images.length > 0 && (
+                                        <Box sx={{ mt: 2 }}>
+                                            <Grid container spacing={2}>
+                                                {recordForm.images.map((image) => (
+                                                    <Grid item xs={6} sm={4} md={3} key={image.id}>
+                                                        <Card>
+                                                            <Box sx={{ position: 'relative' }}>
+                                                                <img
+                                                                    src={image.dataUrl}
+                                                                    alt={image.name}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        height: '120px',
+                                                                        objectFit: 'cover'
+                                                                    }}
+                                                                />
+                                                                <IconButton
+                                                                    size="small"
+                                                                    sx={{
+                                                                        position: 'absolute',
+                                                                        top: 4,
+                                                                        right: 4,
+                                                                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                                                        '&:hover': {
+                                                                            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+                                                                        }
+                                                                    }}
+                                                                    onClick={() => handleImageRemove(image.id)}
+                                                                >
+                                                                    <Delete fontSize="small" />
+                                                                </IconButton>
+                                                            </Box>
+                                                            <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                                                                <Typography variant="caption" noWrap>
+                                                                    {image.name}
+                                                                </Typography>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </Grid>
+                                                ))}
+                                            </Grid>
+                                        </Box>
+                                    )}
+                                </Box>
+                            </Grid>
                         </Grid>
                     </Box>
                 </DialogContent>
@@ -1750,6 +2007,137 @@ const ClassRecord = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenTemplateDialog(false)}>閉じる</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* 記録詳細ダイアログ */}
+            <Dialog open={openDetailDialog} onClose={handleCloseDetail} maxWidth="md" fullWidth>
+                <DialogTitle>
+                    授業記録詳細
+                </DialogTitle>
+                <DialogContent>
+                    {detailRecord && (
+                        <Box sx={{ mt: 1 }}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        生徒名
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mb: 2 }}>
+                                        {detailRecord.studentName}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        実施日
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mb: 2 }}>
+                                        {format(parseISO(detailRecord.date), 'yyyy年MM月dd日', { locale: safeJaLocale })}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        担当者
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mb: 2 }}>
+                                        {detailRecord.instructor || '記録なし'}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        授業範囲
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mb: 2 }}>
+                                        {detailRecord.classRange}
+                                    </Typography>
+                                </Grid>
+                                {detailRecord.typingResult && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            タイピング結果
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ mb: 2 }}>
+                                            {formatTypingResult(detailRecord.typingResult)}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                                {(detailRecord.writingStep || detailRecord.writingType?.length > 0 || detailRecord.writingResult) && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            書き取り結果
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ mb: 2 }}>
+                                            {formatWritingResultForDisplay(detailRecord)}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                                {detailRecord.comment && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            コメント
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                                            {detailRecord.comment}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                                {detailRecord.nextClassRange && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            次回の授業範囲
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ mb: 2 }}>
+                                            {detailRecord.nextClassRange}
+                                        </Typography>
+                                    </Grid>
+                                )}
+                                {detailRecord.images && detailRecord.images.length > 0 && (
+                                    <Grid item xs={12}>
+                                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                                            成果物画像 ({detailRecord.images.length}枚)
+                                        </Typography>
+                                        <Grid container spacing={2}>
+                                            {detailRecord.images.map((image) => (
+                                                <Grid item xs={6} sm={4} md={3} key={image.id}>
+                                                    <Card>
+                                                        <img
+                                                            src={image.dataUrl}
+                                                            alt={image.name}
+                                                            style={{
+                                                                width: '100%',
+                                                                height: '200px',
+                                                                objectFit: 'cover'
+                                                            }}
+                                                        />
+                                                        <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                                                            <Typography variant="caption" noWrap>
+                                                                {image.name}
+                                                            </Typography>
+                                                        </CardContent>
+                                                    </Card>
+                                                </Grid>
+                                            ))}
+                                        </Grid>
+                                    </Grid>
+                                )}
+                            </Grid>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDetail}>閉じる</Button>
+                    {detailRecord && (
+                        <Button
+                            variant="contained"
+                            startIcon={<ImageIcon />}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateImage(detailRecord);
+                            }}
+                        >
+                            画像生成
+                        </Button>
+                    )}
                 </DialogActions>
             </Dialog>
 

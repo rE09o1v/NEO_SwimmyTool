@@ -267,6 +267,93 @@ export const uploadMultipleFiles = async (files) => {
     return results;
 };
 
+// 成果物画像をGoogle Driveにアップロード
+export const uploadResultImages = async (imageFiles, imageData, classRecord) => {
+    try {
+        const classDate = formatDateLocal(classRecord.date);
+        
+        // フォルダ構造: 生徒管理/{生徒名}/{授業日}
+        const folderPath = `生徒管理/${classRecord.studentName}/${classDate}`;
+        const folderNames = folderPath.split('/').filter(name => name.trim() !== '');
+        let currentParentId = null;
+
+        // 階層フォルダを順次作成
+        for (const folderName of folderNames) {
+            const folder = await createOrGetFolder(folderName, currentParentId);
+            currentParentId = folder.id;
+        }
+
+        const uploadResults = [];
+
+        // 各画像をアップロード
+        for (let i = 0; i < imageFiles.length; i++) {
+            const file = imageFiles[i];
+            const imageInfo = imageData[i];
+            
+            const fileName = `成果物_${classRecord.studentName}_${classDate}_${i + 1}_${imageInfo.name}`;
+            
+            try {
+                const result = await uploadFile(file, fileName, currentParentId);
+                uploadResults.push({
+                    fileId: result.id,
+                    fileName: result.name,
+                    webViewLink: `https://drive.google.com/file/d/${result.id}/view`,
+                    originalName: imageInfo.name,
+                    success: true
+                });
+            } catch (error) {
+                uploadResults.push({
+                    originalName: imageInfo.name,
+                    error: error.message,
+                    success: false
+                });
+            }
+        }
+
+        return {
+            folderPath,
+            uploadResults,
+            totalFiles: imageFiles.length,
+            successCount: uploadResults.filter(r => r.success).length
+        };
+    } catch (error) {
+        console.error('成果物画像アップロードエラー:', error);
+        throw error;
+    }
+};
+
+// 評価シートと成果物画像を一括アップロード
+export const uploadEvaluationAndResultImages = async (evaluationBlob, imageFiles, imageData, classRecord) => {
+    try {
+        const results = {
+            evaluation: null,
+            resultImages: null,
+            errors: []
+        };
+
+        // 評価シート画像をアップロード
+        try {
+            results.evaluation = await uploadEvaluationSheet(evaluationBlob, classRecord);
+        } catch (error) {
+            results.errors.push(`評価シートアップロード失敗: ${error.message}`);
+        }
+
+        // 成果物画像をアップロード
+        if (imageFiles && imageFiles.length > 0) {
+            try {
+                results.resultImages = await uploadResultImages(imageFiles, imageData, classRecord);
+            } catch (error) {
+                results.errors.push(`成果物画像アップロード失敗: ${error.message}`);
+            }
+        }
+
+        return results;
+    } catch (error) {
+        console.error('一括アップロードエラー:', error);
+        throw error;
+    }
+};
+
 // Google Drive認証状態をリセット
 export const signOutGoogleDrive = () => {
     if (gapi && gapi.client) {
