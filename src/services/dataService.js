@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
     CLASS_RECORDS: 'swimmy_class_records',
     TEMPLATES: 'swimmy_comment_templates',
     MENTORS: 'swimmy_mentors',
-    CLASSES: 'swimmy_classes'
+    CLASSES: 'swimmy_classes',
+    CURRICULA: 'swimmy_curricula'
 };
 
 // ユーティリティ関数
@@ -670,4 +671,90 @@ export const searchClasses = async (query) => {
         classItem.name.toLowerCase().includes(query.toLowerCase()) ||
         (classItem.description && classItem.description.toLowerCase().includes(query.toLowerCase()))
     );
+};
+
+// カリキュラム管理機能
+export const getCurricula = async (classId = null) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            let curricula = getFromStorage(STORAGE_KEYS.CURRICULA);
+            
+            if (classId) {
+                curricula = curricula.filter(curriculum => curriculum.classId === classId);
+            }
+            
+            // 順序でソート
+            curricula.sort((a, b) => (a.order || 0) - (b.order || 0));
+            resolve(curricula);
+        }, 100);
+    });
+};
+
+export const addCurriculum = async (curriculumData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const curricula = await getCurricula();
+                
+                const newCurriculum = {
+                    id: generateId(),
+                    ...curriculumData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                curricula.push(newCurriculum);
+                saveToStorage(STORAGE_KEYS.CURRICULA, curricula);
+                resolve(newCurriculum);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const updateCurriculum = async (id, curriculumData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const curricula = await getCurricula();
+                const index = curricula.findIndex(curriculum => curriculum.id === id);
+                
+                if (index === -1) {
+                    reject(new Error('カリキュラムが見つかりません'));
+                    return;
+                }
+                
+                curricula[index] = {
+                    ...curricula[index],
+                    ...curriculumData,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                saveToStorage(STORAGE_KEYS.CURRICULA, curricula);
+                resolve(curricula[index]);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const deleteCurriculum = async (id) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const curricula = await getCurricula();
+                const filteredCurricula = curricula.filter(curriculum => curriculum.id !== id);
+                
+                if (saveToStorage(STORAGE_KEYS.CURRICULA, filteredCurricula)) {
+                    resolve(true);
+                } else {
+                    reject(new Error('削除に失敗しました'));
+                }
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
 };

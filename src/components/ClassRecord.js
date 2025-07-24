@@ -72,7 +72,8 @@ import {
     getCommentTemplates,
     getMentors,
     getLastTypingResult,
-    getClasses
+    getClasses,
+    getCurricula
 } from '../services/dataService';
 import { generateEvaluationSheet } from '../services/imageService';
 import { uploadEvaluationSheet, uploadEvaluationAndResultImages, isAuthenticated as isGoogleAuthenticated } from '../services/googleDriveService';
@@ -514,6 +515,7 @@ const ClassRecord = () => {
     const [commentTemplates, setCommentTemplates] = useState([]);
     const [mentors, setMentors] = useState([]);
     const [classes, setClasses] = useState([]);
+    const [curricula, setCurricula] = useState([]);
     const [loading, setLoading] = useState(true);
     const [openDialog, setOpenDialog] = useState(false);
     const [openTemplateDialog, setOpenTemplateDialog] = useState(false);
@@ -537,6 +539,7 @@ const ClassRecord = () => {
         studentName: '',
         date: formatDateLocal(),
         classId: '', // クラス選択
+        curriculumId: '', // カリキュラム選択
         classRange: '', // 従来の授業範囲（後方互換性のため）
         typingGrade: '',
         typingData: {
@@ -687,6 +690,7 @@ const ClassRecord = () => {
                 studentName: record.studentName,
                 date: formattedDate,
                 classId: record.classId || '', // 既存データ互換性のため
+                curriculumId: record.curriculumId || '', // カリキュラム選択
                 classRange: record.classRange,
                 typingGrade: typingGrade,
                 typingData: typingData,
@@ -698,6 +702,17 @@ const ClassRecord = () => {
                 instructor: record.instructor || '',
                 images: record.images || [] // 既存の画像を読み込み
             });
+            
+            // 編集時にクラスが選択されている場合はカリキュラムデータを読み込み
+            if (record.classId) {
+                try {
+                    const curriculaData = await getCurricula(record.classId);
+                    setCurricula(curriculaData);
+                } catch (error) {
+                    console.error('カリキュラムデータの取得に失敗しました:', error);
+                    setCurricula([]);
+                }
+            }
             
             // 編集時の画像ファイル状態をリセット（保存された画像のみ表示）
             setImageFiles([]);
@@ -731,6 +746,7 @@ const ClassRecord = () => {
                 studentName: selectedStudent?.name || '',
                 date: todayFormatted,
                 classId: '',
+                curriculumId: '',
                 classRange: '',
                 typingGrade: defaultTypingGrade,
                 typingData: defaultTypingData,
@@ -760,6 +776,7 @@ const ClassRecord = () => {
             studentName: selectedStudent?.name || '',
             date: formatDateLocal(),
             classId: '',
+            curriculumId: '',
             classRange: '',
             typingGrade: '',
             typingData: {
@@ -815,6 +832,31 @@ const ClassRecord = () => {
                         }
                     }));
                 }
+            }
+        }
+
+        // クラス選択時
+        if (field === 'classId') {
+            if (value) {
+                try {
+                    const curriculaData = await getCurricula(value);
+                    setCurricula(curriculaData);
+                    setRecordForm(prev => ({
+                        ...prev,
+                        curriculumId: '', // クラス変更時はカリキュラム選択をリセット
+                        classRange: '' // 従来の実施範囲もリセット
+                    }));
+                } catch (error) {
+                    console.error('カリキュラムデータの取得に失敗しました:', error);
+                    setCurricula([]);
+                }
+            } else {
+                setCurricula([]);
+                setRecordForm(prev => ({
+                    ...prev,
+                    curriculumId: '',
+                    classRange: ''
+                }));
             }
         }
     };
@@ -1124,17 +1166,30 @@ const ClassRecord = () => {
                                                     ? classes.find(c => c.id === record.classId)
                                                     : null;
                                                 const className = classInfo ? classInfo.name : '';
+                                                
+                                                // カリキュラム情報を取得（将来的にカリキュラムデータも表示可能にするため）
+                                                const curriculumInfo = record.curriculumId 
+                                                    ? curricula.find(c => c.id === record.curriculumId)
+                                                    : null;
+                                                const curriculumName = curriculumInfo ? curriculumInfo.title : '';
                                                 const range = record.classRange || '';
                                                 
-                                                if (className && range) {
-                                                    return `${className}: ${range}`;
-                                                } else if (className) {
-                                                    return `クラス: ${className}`;
+                                                let displayText = '';
+                                                if (className) {
+                                                    displayText = `クラス: ${className}`;
+                                                    if (curriculumName) {
+                                                        displayText += ` | カリキュラム: ${curriculumName}`;
+                                                    }
+                                                    if (range) {
+                                                        displayText += ` | 範囲: ${range}`;
+                                                    }
                                                 } else if (range) {
-                                                    return `授業範囲: ${range}`;
+                                                    displayText = `授業範囲: ${range}`;
                                                 } else {
-                                                    return '授業範囲: 未設定';
+                                                    displayText = '授業範囲: 未設定';
                                                 }
+                                                
+                                                return displayText;
                                             })()}
                                         </Typography>
 
@@ -1883,13 +1938,37 @@ const ClassRecord = () => {
                                 </FormControl>
                             </Grid>
                             <Grid item xs={12} md={6}>
+                                <FormControl fullWidth margin="normal">
+                                    <InputLabel>カリキュラム</InputLabel>
+                                    <Select
+                                        value={recordForm.curriculumId}
+                                        label="カリキュラム"
+                                        onChange={(e) => handleFormChange('curriculumId', e.target.value)}
+                                        disabled={!recordForm.classId}
+                                    >
+                                        <MenuItem value="">選択してください</MenuItem>
+                                        {curricula.map((curriculum) => (
+                                            <MenuItem key={curriculum.id} value={curriculum.id}>
+                                                {curriculum.title} {curriculum.description && `(${curriculum.description})`}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                    {!recordForm.classId && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                                            先にクラスを選択してください
+                                        </Typography>
+                                    )}
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
                                 <TextField
                                     fullWidth
                                     label="実施範囲"
                                     value={recordForm.classRange}
                                     onChange={(e) => handleFormChange('classRange', e.target.value)}
                                     margin="normal"
-                                    placeholder="例: Unit 1-3, 基本操作"
+                                    placeholder="例: Unit 1-3, 基本操作（カリキュラム未選択時）"
+                                    helperText="カリキュラムを選択した場合、この項目は補足情報として使用されます"
                                 />
                             </Grid>
                             <Grid item xs={12} md={6}>
@@ -2209,28 +2288,38 @@ const ClassRecord = () => {
                                         {detailRecord.instructor || '記録なし'}
                                     </Typography>
                                 </Grid>
-                                <Grid item xs={12}>
+                                <Grid item xs={12} md={6}>
                                     <Typography variant="subtitle2" color="text.secondary">
-                                        授業範囲
+                                        クラス
                                     </Typography>
                                     <Typography variant="body1" sx={{ mb: 2 }}>
                                         {(() => {
                                             const classInfo = detailRecord.classId 
                                                 ? classes.find(c => c.id === detailRecord.classId)
                                                 : null;
-                                            const className = classInfo ? classInfo.name : '';
-                                            const range = detailRecord.classRange || '';
-                                            
-                                            if (className && range) {
-                                                return `${className}: ${range}`;
-                                            } else if (className) {
-                                                return `クラス: ${className}`;
-                                            } else if (range) {
-                                                return range;
-                                            } else {
-                                                return '未設定';
-                                            }
+                                            return classInfo ? classInfo.name : '未設定';
                                         })()}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        カリキュラム
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mb: 2 }}>
+                                        {(() => {
+                                            const curriculumInfo = detailRecord.curriculumId 
+                                                ? curricula.find(c => c.id === detailRecord.curriculumId)
+                                                : null;
+                                            return curriculumInfo ? curriculumInfo.title : '未選択';
+                                        })()}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        実施範囲・補足
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ mb: 2 }}>
+                                        {detailRecord.classRange || '記録なし'}
                                     </Typography>
                                 </Grid>
                                 {detailRecord.typingResult && (

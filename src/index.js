@@ -25,12 +25,13 @@ const theme = createTheme({
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-    <React.StrictMode>
+    // React.StrictMode を一時的に無効化 (react-beautiful-dnd の互換性問題のため)
+    // <React.StrictMode>
         <BrowserRouter>
             <ThemeProvider theme={theme}>
                 <CssBaseline />
                 <App />
             </ThemeProvider>
         </BrowserRouter>
-    </React.StrictMode>
+    // </React.StrictMode>
 ); 
