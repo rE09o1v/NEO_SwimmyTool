@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
     TEMPLATES: 'swimmy_comment_templates',
     MENTORS: 'swimmy_mentors',
     CLASSES: 'swimmy_classes',
-    CURRICULA: 'swimmy_curricula'
+    CURRICULA: 'swimmy_curricula',
+    STUDENT_MEMOS: 'swimmy_student_memos'
 };
 
 // ユーティリティ関数
@@ -748,6 +749,88 @@ export const deleteCurriculum = async (id) => {
                 const filteredCurricula = curricula.filter(curriculum => curriculum.id !== id);
                 
                 if (saveToStorage(STORAGE_KEYS.CURRICULA, filteredCurricula)) {
+                    resolve(true);
+                } else {
+                    reject(new Error('削除に失敗しました'));
+                }
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+// ユーザーメモ管理機能
+export const getStudentMemos = async (studentId) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const memos = getFromStorage(STORAGE_KEYS.STUDENT_MEMOS);
+            const studentMemos = memos.filter(memo => memo.studentId === studentId);
+            // 更新日時でソート（新しい順）
+            studentMemos.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            resolve(studentMemos);
+        }, 100);
+    });
+};
+
+export const addStudentMemo = async (memoData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const memos = getFromStorage(STORAGE_KEYS.STUDENT_MEMOS);
+                
+                const newMemo = {
+                    id: generateId(),
+                    ...memoData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                memos.push(newMemo);
+                saveToStorage(STORAGE_KEYS.STUDENT_MEMOS, memos);
+                resolve(newMemo);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const updateStudentMemo = async (id, memoData) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const memos = getFromStorage(STORAGE_KEYS.STUDENT_MEMOS);
+                const index = memos.findIndex(memo => memo.id === id);
+                
+                if (index === -1) {
+                    reject(new Error('メモが見つかりません'));
+                    return;
+                }
+                
+                memos[index] = {
+                    ...memos[index],
+                    ...memoData,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                saveToStorage(STORAGE_KEYS.STUDENT_MEMOS, memos);
+                resolve(memos[index]);
+            } catch (error) {
+                reject(error);
+            }
+        }, 100);
+    });
+};
+
+export const deleteStudentMemo = async (id) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const memos = getFromStorage(STORAGE_KEYS.STUDENT_MEMOS);
+                const filteredMemos = memos.filter(memo => memo.id !== id);
+                
+                if (saveToStorage(STORAGE_KEYS.STUDENT_MEMOS, filteredMemos)) {
                     resolve(true);
                 } else {
                     reject(new Error('削除に失敗しました'));

@@ -31,7 +31,8 @@ import {
     Delete,
     Search,
     PersonAdd,
-    Assignment
+    Assignment,
+    StickyNote2
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -42,6 +43,7 @@ import {
     searchStudents,
     initializeDemoData
 } from '../services/dataService';
+import StudentMemo from './StudentMemo';
 
 const StudentManagement = () => {
     const navigate = useNavigate();
@@ -57,6 +59,7 @@ const StudentManagement = () => {
         googleDriveFolder: ''
     });
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const [memoDialog, setMemoDialog] = useState({ open: false, studentId: null, studentName: '' });
 
     const courses = [
         'スクラッチプログラミング',
@@ -189,6 +192,18 @@ const StudentManagement = () => {
         navigate(`/class-record/${student.id}`);
     };
 
+    const handleOpenMemo = (student) => {
+        setMemoDialog({ 
+            open: true, 
+            studentId: student.id, 
+            studentName: student.name 
+        });
+    };
+
+    const handleCloseMemo = () => {
+        setMemoDialog({ open: false, studentId: null, studentName: '' });
+    };
+
     return (
         <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -274,6 +289,16 @@ const StudentManagement = () => {
                                             sx={{ mr: 1, mb: 1 }}
                                         >
                                             授業記録
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<StickyNote2 />}
+                                            onClick={() => handleOpenMemo(student)}
+                                            sx={{ mr: 1, mb: 1 }}
+                                            color="secondary"
+                                        >
+                                            メモ
                                         </Button>
                                         <IconButton
                                             size="small"
@@ -393,6 +418,14 @@ const StudentManagement = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* メモダイアログ */}
+            <StudentMemo
+                studentId={memoDialog.studentId}
+                studentName={memoDialog.studentName}
+                open={memoDialog.open}
+                onClose={handleCloseMemo}
+            />
         </Box>
     );
 };
