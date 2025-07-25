@@ -16,7 +16,11 @@ import {
     Chip,
     Fab,
     Paper,
-    Divider
+    Divider,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel
 } from '@mui/material';
 import {
     Add,
@@ -32,19 +36,23 @@ import {
     getStudentMemos,
     addStudentMemo,
     updateStudentMemo,
-    deleteStudentMemo
+    deleteStudentMemo,
+    getMentors
 } from '../services/dataService';
 
 const StudentMemo = ({ studentId, studentName, open, onClose }) => {
     const [memos, setMemos] = useState([]);
     const [editingMemo, setEditingMemo] = useState(null);
     const [memoText, setMemoText] = useState('');
+    const [selectedMentor, setSelectedMentor] = useState('');
+    const [mentors, setMentors] = useState([]);
     const [isCreating, setIsCreating] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (open && studentId) {
             loadMemos();
+            loadMentors();
         }
     }, [open, studentId]);
 
@@ -60,35 +68,49 @@ const StudentMemo = ({ studentId, studentName, open, onClose }) => {
         }
     };
 
+    const loadMentors = async () => {
+        try {
+            const mentorsData = await getMentors();
+            setMentors(mentorsData);
+        } catch (error) {
+            console.error('メンターの読み込みに失敗しました:', error);
+        }
+    };
+
     const handleCreateMemo = () => {
         setIsCreating(true);
         setMemoText('');
+        setSelectedMentor('');
         setEditingMemo(null);
     };
 
     const handleEditMemo = (memo) => {
         setEditingMemo(memo.id);
         setMemoText(memo.content);
+        setSelectedMentor(memo.createdBy || '');
         setIsCreating(false);
     };
 
     const handleSaveMemo = async () => {
-        if (!memoText.trim()) return;
+        if (!memoText.trim() || !selectedMentor) return;
 
         setLoading(true);
         try {
             if (isCreating) {
                 await addStudentMemo({
                     studentId,
-                    content: memoText.trim()
+                    content: memoText.trim(),
+                    createdBy: selectedMentor
                 });
             } else if (editingMemo) {
                 await updateStudentMemo(editingMemo, {
-                    content: memoText.trim()
+                    content: memoText.trim(),
+                    createdBy: selectedMentor
                 });
             }
             
             setMemoText('');
+            setSelectedMentor('');
             setEditingMemo(null);
             setIsCreating(false);
             await loadMemos();
@@ -115,6 +137,7 @@ const StudentMemo = ({ studentId, studentName, open, onClose }) => {
 
     const handleCancel = () => {
         setMemoText('');
+        setSelectedMentor('');
         setEditingMemo(null);
         setIsCreating(false);
     };
@@ -165,6 +188,21 @@ const StudentMemo = ({ studentId, studentName, open, onClose }) => {
                 {/* 新規作成・編集フォーム */}
                 {(isCreating || editingMemo) && (
                     <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+                        <FormControl fullWidth sx={{ mb: 2 }}>
+                            <InputLabel>作成者（メンター）</InputLabel>
+                            <Select
+                                value={selectedMentor}
+                                onChange={(e) => setSelectedMentor(e.target.value)}
+                                label="作成者（メンター）"
+                            >
+                                {mentors.map((mentor) => (
+                                    <MenuItem key={mentor.id} value={mentor.name || `${mentor.lastName} ${mentor.firstName}`}>
+                                        {mentor.name || `${mentor.lastName} ${mentor.firstName}`}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        
                         <TextField
                             fullWidth
                             multiline
@@ -188,7 +226,7 @@ const StudentMemo = ({ studentId, studentName, open, onClose }) => {
                                 variant="contained"
                                 startIcon={<Save />}
                                 onClick={handleSaveMemo}
-                                disabled={loading || !memoText.trim()}
+                                disabled={loading || !memoText.trim() || !selectedMentor}
                             >
                                 保存
                             </Button>
@@ -222,7 +260,15 @@ const StudentMemo = ({ studentId, studentName, open, onClose }) => {
                                                 >
                                                     {memo.content}
                                                 </Typography>
-                                                <Box display="flex" gap={1} alignItems="center">
+                                                <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+                                                    {memo.createdBy && (
+                                                        <Chip
+                                                            label={`作成者: ${memo.createdBy}`}
+                                                            size="small"
+                                                            variant="filled"
+                                                            color="default"
+                                                        />
+                                                    )}
                                                     <Chip
                                                         label={`作成: ${formatDate(memo.createdAt)}`}
                                                         size="small"
