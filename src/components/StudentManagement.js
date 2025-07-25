@@ -32,7 +32,8 @@ import {
     Search,
     PersonAdd,
     Assignment,
-    StickyNote2
+    StickyNote2,
+    TrendingUp
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -299,6 +300,16 @@ const StudentManagement = () => {
                                             color="secondary"
                                         >
                                             メモ
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            startIcon={<TrendingUp />}
+                                            onClick={() => navigate(`/statistics-data/${student.id}`)}
+                                            sx={{ mr: 1, mb: 1 }}
+                                            color="info"
+                                        >
+                                            統計データ
                                         </Button>
                                         <IconButton
                                             size="small"

@@ -760,6 +760,242 @@ export const deleteCurriculum = async (id) => {
     });
 };
 
+// 学習進捗トラッキング機能（カリキュラムベース）
+export const getStudentProgress = async (studentId, monthsBack = 6) => {
+    return new Promise((resolve) => {
+        setTimeout(async () => {
+            try {
+                const records = await getClassRecords(studentId);
+                const student = await getStudent(studentId);
+                const allClasses = await getClasses();
+                const allCurricula = await getCurricula();
+                
+                if (!student) {
+                    resolve(null);
+                    return;
+                }
+
+                // 指定期間内のレコードをフィルタリング
+                const cutoffDate = new Date();
+                cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+                
+                const recentRecords = records.filter(record => 
+                    new Date(record.date) >= cutoffDate
+                );
+
+                // カリキュラム進捗の計算
+                const curriculumProgress = calculateCurriculumProgress(recentRecords, allClasses, allCurricula);
+                
+                // 学習トピックの多様性計算
+                const topicDiversity = calculateTopicDiversity(recentRecords);
+                
+                // 統計情報の計算
+                const stats = calculateCurriculumStats(curriculumProgress, topicDiversity, recentRecords);
+                
+                resolve({
+                    studentId,
+                    studentName: student.name,
+                    studentCourse: student.course,
+                    totalRecords: recentRecords.length,
+                    curriculumProgress,
+                    topicDiversity,
+                    stats,
+                    recentRecords: recentRecords.slice(0, 5) // 最新5件
+                });
+            } catch (error) {
+                console.error('進捗データの取得に失敗しました:', error);
+                resolve(null);
+            }
+        }, 100);
+    });
+};
+
+// カリキュラム進捗を計算する関数
+const calculateCurriculumProgress = (records, allClasses, allCurricula) => {
+    // 学習済みトピックを抽出
+    const studiedTopics = records.map(record => record.classRange).filter(Boolean);
+    const uniqueTopics = [...new Set(studiedTopics)];
+    
+    // クラス別の進捗を計算
+    const classesByName = allClasses.reduce((acc, cls) => {
+        acc[cls.name] = cls;
+        return acc;
+    }, {});
+    
+    const classProgress = {};
+    
+    allClasses.forEach(cls => {
+        const classTopics = allCurricula.filter(curriculum => curriculum.classId === cls.id);
+        const studiedClassTopics = uniqueTopics.filter(topic => 
+            classTopics.some(curriculum => curriculum.title === topic || curriculum.name === topic)
+        );
+        
+        classProgress[cls.name] = {
+            classId: cls.id,
+            className: cls.name,
+            description: cls.description,
+            totalTopics: classTopics.length,
+            studiedTopics: studiedClassTopics.length,
+            completionRate: classTopics.length > 0 ? 
+                Math.round((studiedClassTopics.length / classTopics.length) * 100) : 0,
+            topics: classTopics.map(curriculum => ({
+                ...curriculum,
+                studied: studiedClassTopics.includes(curriculum.title || curriculum.name)
+            }))
+        };
+    });
+    
+    return {
+        uniqueTopicsCount: uniqueTopics.length,
+        totalStudySessions: studiedTopics.length,
+        classProgress,
+        studiedTopics: uniqueTopics
+    };
+};
+
+// 学習トピックの多様性を計算する関数
+const calculateTopicDiversity = (records) => {
+    const topicFrequency = {};
+    const recentTopics = [];
+    
+    records.forEach(record => {
+        if (record.classRange) {
+            topicFrequency[record.classRange] = (topicFrequency[record.classRange] || 0) + 1;
+            recentTopics.push({
+                topic: record.classRange,
+                date: record.date,
+                writingResult: record.writingResult
+            });
+        }
+    });
+    
+    // 多様性スコア（異なるトピック数 / 総授業数）
+    const diversityScore = records.length > 0 ? 
+        Math.round((Object.keys(topicFrequency).length / records.length) * 100) : 0;
+    
+    return {
+        topicFrequency,
+        recentTopics,
+        diversityScore,
+        mostStudiedTopic: Object.keys(topicFrequency).reduce((a, b) => 
+            topicFrequency[a] > topicFrequency[b] ? a : b, '')
+    };
+};
+
+// カリキュラムベースの統計情報を計算する関数
+const calculateCurriculumStats = (curriculumProgress, topicDiversity, records) => {
+    if (records.length === 0) {
+        return {
+            totalTopicsStudied: 0,
+            averageCompletionRate: 0,
+            topicDiversityScore: 0,
+            attendanceRate: 0,
+            currentStreak: 0,
+            mostAdvancedClass: '',
+            recentTopicCount: 0
+        };
+    }
+
+    // 全クラスの平均完了率
+    const classProgressValues = Object.values(curriculumProgress.classProgress);
+    const averageCompletionRate = classProgressValues.length > 0 ? 
+        Math.round(classProgressValues.reduce((sum, cp) => sum + cp.completionRate, 0) / classProgressValues.length) : 0;
+
+    // 最も進んでいるクラスを特定
+    const mostAdvancedClass = classProgressValues.reduce((prev, current) => 
+        (current.completionRate > prev.completionRate) ? current : prev, 
+        { className: '', completionRate: 0 }
+    );
+
+    // 出席率計算（週1回の想定で計算）
+    const weeksInPeriod = Math.ceil((new Date() - new Date(Math.min(...records.map(r => new Date(r.date))))) / (7 * 24 * 60 * 60 * 1000));
+    const attendanceRate = weeksInPeriod > 0 ? Math.min(100, Math.round((records.length / weeksInPeriod) * 100)) : 100;
+
+    // 連続出席記録計算
+    const currentStreak = calculateCurrentStreak(records);
+
+    // 最近1ヶ月のトピック数
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const recentTopics = records.filter(record => new Date(record.date) >= oneMonthAgo)
+        .map(record => record.classRange).filter(Boolean);
+    const recentTopicCount = new Set(recentTopics).size;
+
+    return {
+        totalTopicsStudied: curriculumProgress.uniqueTopicsCount,
+        averageCompletionRate,
+        topicDiversityScore: topicDiversity.diversityScore,
+        attendanceRate,
+        currentStreak,
+        mostAdvancedClass: mostAdvancedClass.className,
+        recentTopicCount
+    };
+};
+
+// 連続出席記録を計算する関数
+const calculateCurrentStreak = (records) => {
+    if (records.length === 0) return 0;
+    
+    // 日付でソート（新しい順）
+    const sortedRecords = records.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    let streak = 0;
+    let currentDate = new Date();
+    
+    for (const record of sortedRecords) {
+        const recordDate = new Date(record.date);
+        const daysDiff = Math.floor((currentDate - recordDate) / (24 * 60 * 60 * 1000));
+        
+        // 7日以内であれば連続とみなす
+        if (daysDiff <= 7 * (streak + 1)) {
+            streak++;
+            currentDate = recordDate;
+        } else {
+            break;
+        }
+    }
+    
+    return streak;
+};
+
+// 全生徒の進捗サマリーを取得（カリキュラムベース）
+export const getAllStudentsProgressSummary = async () => {
+    return new Promise((resolve) => {
+        setTimeout(async () => {
+            try {
+                const students = await getStudents();
+                const progressSummaries = [];
+                
+                for (const student of students) {
+                    const progress = await getStudentProgress(student.id, 3); // 3ヶ月間
+                    if (progress) {
+                        progressSummaries.push({
+                            studentId: student.id,
+                            studentName: student.name,
+                            course: student.course,
+                            totalRecords: progress.totalRecords,
+                            totalTopicsStudied: progress.stats.totalTopicsStudied,
+                            averageCompletionRate: progress.stats.averageCompletionRate,
+                            topicDiversityScore: progress.stats.topicDiversityScore,
+                            attendanceRate: progress.stats.attendanceRate,
+                            currentStreak: progress.stats.currentStreak,
+                            mostAdvancedClass: progress.stats.mostAdvancedClass,
+                            recentTopicCount: progress.stats.recentTopicCount,
+                            lastRecordDate: progress.recentRecords.length > 0 ? 
+                                progress.recentRecords[0].date : null
+                        });
+                    }
+                }
+                
+                resolve(progressSummaries);
+            } catch (error) {
+                console.error('全生徒進捗サマリーの取得に失敗しました:', error);
+                resolve([]);
+            }
+        }, 150);
+    });
+};
+
 // ユーザーメモ管理機能
 export const getStudentMemos = async (studentId) => {
     return new Promise((resolve) => {

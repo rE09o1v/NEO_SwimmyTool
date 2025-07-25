@@ -7,6 +7,7 @@ import StudentManagement from './components/StudentManagement';
 import ClassRecord from './components/ClassRecord';
 import MentorManagement from './components/MentorManagement';
 import ClassManagement from './components/ClassManagement';
+import StatisticsData from './components/StatisticsData';
 import Navbar from './components/Navbar';
 import { initializeDemoData } from './services/dataService';
 
@@ -67,6 +68,8 @@ function App() {
                     <Route path="/students" element={<StudentManagement />} />
                     <Route path="/class-record" element={<ClassRecord />} />
                     <Route path="/class-record/:studentId" element={<ClassRecord />} />
+                    <Route path="/statistics-data" element={<StatisticsData />} />
+                    <Route path="/statistics-data/:studentId" element={<StatisticsData />} />
                     <Route
                         path="/mentors"
                         element={
