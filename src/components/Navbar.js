@@ -28,7 +28,8 @@ import {
     Person,
     Settings,
     PersonAdd,
-    Class
+    Class,
+    TrendingUp
 } from '@mui/icons-material';
 import { isAuthenticated as isGoogleAuthenticated, signOutGoogleDrive } from '../services/googleDriveService';
 
@@ -44,7 +45,8 @@ const Navbar = ({ onLogout, user }) => {
         const baseItems = [
             { label: 'ダッシュボード', icon: <Dashboard />, path: '/' },
             { label: '生徒管理', icon: <People />, path: '/students' },
-            { label: '授業記録', icon: <Assignment />, path: '/class-record' }
+            { label: '授業記録', icon: <Assignment />, path: '/class-record' },
+            { label: '統計データ', icon: <TrendingUp />, path: '/statistics-data' }
         ];
 
         // 管理者の場合は管理メニューを追加
@@ -73,7 +75,8 @@ const Navbar = ({ onLogout, user }) => {
     const getCurrentValue = () => {
         const currentItem = navigationItems.find(item =>
             item.path === location.pathname ||
-            (item.path === '/class-record' && location.pathname.startsWith('/class-record'))
+            (item.path === '/class-record' && location.pathname.startsWith('/class-record')) ||
+            (item.path === '/statistics-data' && location.pathname.startsWith('/statistics-data'))
         );
         return currentItem ? navigationItems.indexOf(currentItem) : 0;
     };
